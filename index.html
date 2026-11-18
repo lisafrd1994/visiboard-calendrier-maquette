@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VisiBoard · Calendrier de formation</title>
+<style>
+:root{--ink:#242424;--muted:#515151;--line:#d4d4d4;--blue:#337ab7;--outline:#719bd0}
+*{box-sizing:border-box}body{margin:0;background:white;color:var(--ink);font:14px/1.43 Arial,Helvetica,sans-serif}
+main{max-width:1550px;margin:auto;padding:14px 16px 42px}
+h1,h2,h3{font-weight:400;line-height:1.2;margin:0 0 9px}h1{font-size:27px}h2,h3{font-size:22px}p{margin:6px 0 10px}small,.mini{font-size:12px}.muted{color:var(--muted)}
+button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disabled{opacity:.6;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #16488d;outline-offset:2px}
+label{display:block;font-weight:700;font-size:13px}input:not([type=checkbox]),select{display:block;min-width:0;width:100%;margin-top:5px;height:32px;padding:5px 9px;color:#333;background:white;border:1px solid #bfbfbf;border-radius:4px;box-shadow:inset 0 1px 2px #0001}input[readonly]{background:#f6f6f6;color:#444}
+.action,.ghost{padding:6px 11px;border:1px solid #28659a;border-radius:3px;background:var(--blue);color:white;font-size:13px;line-height:1.25}.ghost{border-color:#bcbcbc;background:#f8f8f8;color:#333}.action:hover{background:#28659a}.ghost:hover{background:#eee}
+.cases{display:flex;flex-wrap:wrap;align-items:center;gap:7px 15px;margin:0 0 9px}.cases label{display:flex;align-items:center;gap:7px}.cases select{width:auto;margin:0}.context{margin:0 0 11px;color:var(--muted);font-size:13px}
+.dates,.calendar-pane{border:1px solid var(--outline);padding:13px 13px 15px}.fields,.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 27px}.fields{margin-bottom:10px}.soutenance-fields{grid-template-columns:minmax(130px,185px) minmax(160px,275px);width:min(100%,500px)}.facts{border-top:1px solid #e6e6e6;margin-top:16px;padding-top:15px}.facts small{display:block;color:#345b77;margin-top:4px}
+fieldset{padding:0;margin:0 0 14px;border:0}fieldset legend{font-weight:700;font-size:13px;padding:0;margin-bottom:3px}.rest-line{display:flex;gap:3px 10px;flex-wrap:wrap}.rest-line span{display:inline-flex;align-items:center;gap:4px;font-size:13px}.rest-line input{opacity:1;margin:0;accent-color:#337ab7}
+.actions,.section-head{display:flex;gap:7px 10px;flex-wrap:wrap;align-items:center}.section-head{justify-content:space-between}.check{display:flex;align-items:center;gap:5px;margin-top:7px}.date-extra{margin-top:10px}
+details{font-size:13px}summary{cursor:pointer;color:#245989}details details{margin:8px 0}details p{margin:5px 0 8px}details ol{margin:6px 0;padding-left:21px}
+.layout{display:grid;grid-template-columns:minmax(175px,230px) minmax(0,1fr);gap:17px;align-items:start;margin-top:12px}
+.side{position:sticky;top:12px;min-width:0;max-height:calc(100vh - 24px);overflow:auto;padding:0 3px 8px 0}.volume{width:100%;border-collapse:collapse;font-size:12px;background:#f7f7f7;margin-bottom:12px}.volume td,.volume th{border:1px solid var(--line);padding:7px;text-align:left}.volume th{font-weight:400}.volume strong{color:#226427}.choice{padding:8px 0;border-top:1px solid #e2e2e2;margin-top:10px}.choice strong{display:block}.side details{border-top:1px solid #e2e2e2;margin:10px 0;padding-top:8px}.edit{margin-top:4px}
+.calendar-pane{min-width:0}.calendar-pane .section-head{padding-bottom:12px;border-bottom:1px solid #eee}.legend{display:flex;gap:7px 15px;flex-wrap:wrap;margin:14px 0 10px}.legend span{display:inline-flex;align-items:center;gap:5px;font-size:12px}.swatch{width:15px;height:15px;border:1px solid #0002;display:inline-block}
+.year-grid,.print-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px 24px;margin-top:18px}.month h3:first-letter{text-transform:uppercase}.month h3{margin-bottom:7px;font-size:22px}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #ccc;border-left:1px solid #ccc}.weekday,.day{border:0;border-right:1px solid #0002;border-bottom:1px solid #0002;padding:7px 6px;min-width:0;min-height:33px;text-align:left}.weekday{font-size:12px;font-weight:700;background:#fff}.day strong{font-size:13px;font-weight:400}.day:hover:not(.out),.day[aria-pressed=true]{box-shadow:inset 0 0 0 2px #1c4771}.day[aria-pressed=true]{font-weight:bold}.day[aria-pressed=true] strong{font-weight:700}
+.company{background:#fff48a;color:#302a12}.rest{background:#d7d7d7;color:#353535}.holiday{background:#c4c4c4;color:#242424}.out{background:#ededed;color:#656565}.ordinary{background:#b8dff1;color:#15394c}.block{background:#77bcda;color:#102f40}.entry{background:#a7d6b6;color:#183d24}.fixed{background:#f0b3aa;color:#52241e}.end{background:#d8c4e9;color:#452a58}
+.decision{margin:5px 0;padding:5px 7px;border-left:3px solid #77bcda;background:#f5f8fb}.decision.skipped{border-color:#c4841a;background:#fff7e4}.decision button{border:0;background:none;color:#174f81;padding:0;text-align:left;text-decoration:underline;line-height:inherit}.decision button:hover{color:#102f55}
+.feedback{font-size:13px;background:#eaf5ed;color:#21572e;padding:5px 8px;margin-top:7px}.feedback:empty{display:none}.warn{background:#fff4da;color:#624600}.bad{background:#f9e5e5;color:#872222}
+.modal{width:min(940px,96vw);max-height:90vh;border:1px solid #aaa;padding:15px}.modal::backdrop{background:#0006}.print-grid{gap:10px}.print-grid .weekday,.print-grid .day{min-height:22px;padding:3px}.print-grid h3{font-size:15px}
+@media(max-width:1050px){.year-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:670px){main{padding:9px}.layout{display:flex;flex-direction:column;gap:9px}.side{position:static;max-height:none;width:100%}.calendar-pane{width:100%}.fields,.facts{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.year-grid{grid-template-columns:1fr}.print-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media print{body>*:not(dialog){display:none!important}dialog[open]{display:block;position:static;width:100%;max-height:none;border:0;margin:0;padding:0;overflow:visible}.no-print{display:none!important}.print-grid section{break-inside:avoid}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main>
+<div class="cases"><label>Cas de démonstration <select id="scenarios"></select></label><small id="product"></small></div>
+<p id="case-description" class="context"></p>
+<section class="dates" aria-labelledby="dates-title">
+<h1 id="dates-title">Dates</h1>
+<form id="form">
+<div class="fields">
+<label>Date du début de contrat<input id="start" type="date" required></label>
+<label>Jour récurrent de formation à distance<select id="weekday"></select></label>
+</div>
+<fieldset><legend>Jour(s) de repos</legend><div class="rest-line" id="rest"></div></fieldset>
+<h2>Soutenances</h2>
+<p>Soutenance orale</p>
+<div class="fields soutenance-fields">
+<label>Année de soutenance<select id="defense-year"></select></label>
+<label>Mois de soutenance<select id="defense-month"></select></label>
+</div>
+<button class="action">Générer les dates</button>
+</form>
+<div class="facts">
+<label>Date de fin de contrat<input id="end-choice" type="date"><small id="limit-end"></small></label>
+<label>Date du début de la formation<input id="entry-date" type="date" readonly><small id="limit-start"></small></label>
+<label>Date de fin de la formation<input id="end-date" type="date" readonly><small>Dernier jour ouvré du mois de soutenance</small></label>
+</div>
+<div class="date-extra"><button id="apply-end" class="ghost" type="button">Appliquer la fin de contrat</button></div>
+<div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la date recommandée.</label></div>
+<div id="date-message" class="feedback" role="status"></div>
+<details class="date-extra"><summary>Comprendre le calcul des dates</summary><div id="explain"></div></details>
+</section>
+<div class="layout">
+<aside class="side" aria-label="Compteur et explications">
+<table class="volume" id="stats" aria-label="Volume de formation planifié"></table>
+<details open><summary>Journée sélectionnée</summary><div id="choice" class="choice" aria-live="polite"></div><div id="edit" class="actions edit"></div></details>
+<details open><summary>Pourquoi ces semaines pleines ?</summary><div id="weeks"></div></details>
+<details><summary>Jours non modifiables</summary><p id="fixed-summary"></p><button id="publish" class="ghost" type="button">Simuler une nouvelle date fixe</button><div id="fixed-message" class="feedback" role="status"></div></details>
+<details><summary>Hypothèses de la maquette</summary><p>Les volumes et les dates fixes sont des données de démonstration. La répartition du complément et le jour ordinaire à remplacer restent à valider. Une occurrence récurrente fériée est sautée dans cet exemple.</p></details>
+</aside>
+<section class="calendar-pane" aria-label="Calendrier de formation prévisionnel">
+<div class="section-head"><button type="button" id="regenerate" class="action">Générer un nouveau calendrier</button><button id="preview" type="button" class="ghost">Aperçu du PDF</button></div>
+<div id="legend" class="legend"></div>
+<div id="shortcuts" class="actions" aria-label="Accès aux repères du calendrier"></div>
+<div id="calendar-message" class="feedback" role="status"></div>
+<div id="calendar" class="year-grid" aria-label="Tous les mois du contrat"></div>
+</section>
+</div>
+</main>
+<dialog id="document" class="modal"><div class="section-head"><h2>Calendrier prévisionnel de formation</h2><div class="no-print"><button id="print" class="action">Imprimer / PDF</button> <button id="close" class="ghost">Fermer</button></div></div><p id="pdf-summary"></p><div class="legend" id="pdf-legend"></div><div class="print-grid" id="pdf-grid"></div></dialog>
+<script>
+const cases = [
+  {name:"Communication visuelle", tag:"Parcours complet", subtitle:"Cas de départ · 945 h", description:"Le contrat commence en décembre 2026. Observez le calcul de la rentrée et la répartition des heures avant la soutenance de février 2029.", start:"2026-12-07", defense:"2029-02", weekday:3, rest:[0,6], target:135, fixed:["2029-01-09","2029-01-10"], level:3, duration:24},
+  {name:"Parcours réduit", tag:"Réduction de formation", subtitle:"Jours de repos lundi et dimanche · 420 h", description:"Ce cas reprend le rythme d’entreprise de Casa Serena. Le samedi est travaillé en entreprise. Une semaine pleine de formation reste limitée au mardi, mercredi, jeudi et vendredi.", start:"2026-11-17", defense:"2027-12", weekday:2, rest:[0,1], target:60, fixed:["2027-10-14"], level:2, duration:12},
+  {name:"Semaine avec un jour férié", tag:"Cas du pont", subtitle:"Dernière semaine de décembre · Noël un mardi", description:"La soutenance est en janvier 2030. La dernière semaine complète de décembre contient Noël. Le journal indique la semaine écartée et explique où le bloc est placé.", start:"2028-11-13", defense:"2030-01", weekday:3, rest:[0,6], target:76, fixed:["2029-11-15"], level:3, duration:12}
+];
+const kinds={
+  entry:["Jour de rentrée en formation","Rentrée"],
+  ordinary:["Jour de formation","Formation"],
+  block:["Jour de formation · semaine pleine","Semaine pleine"],
+  fixed:["Jour de formation non modifiable","Non modifiable"],
+  end:["Dernier jour de formation","Fin formation"],
+  company:["Jour en entreprise","Entreprise"],
+  rest:["Jour de repos","Repos"],
+  holiday:["Jour férié","Férié"],
+  out:["Hors contrat","Hors contrat"]
+};
+const dayNames=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
+const daysShort=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+const DAY=86400000, hours=7;
+const date=(y,m,d)=>Date.UTC(y,m-1,d)/DAY;
+const parse=value=>value ? Date.parse(value)/DAY : NaN;
+const iso=d=>new Date(d*DAY).toISOString().slice(0,10);
+const obj=d=>new Date(d*DAY);
+const weekday=d=>obj(d).getUTCDay();
+const monthStart=d=>date(obj(d).getUTCFullYear(),obj(d).getUTCMonth()+1,1);
+const monthOffset=(d,n)=>date(obj(d).getUTCFullYear(),obj(d).getUTCMonth()+1+n,1);
+const monthKey=d=>iso(d).slice(0,7);
+const monday=d=>d-(weekday(d)+6)%7;
+const fmt=(d,options)=>new Intl.DateTimeFormat("fr-FR",{timeZone:"UTC",...options}).format(obj(d));
+const full=d=>fmt(d,{day:"numeric",month:"long",year:"numeric"});
+const short=d=>fmt(d,{day:"numeric",month:"long"});
+const monthLabel=d=>fmt(d,{month:"long",year:"numeric"});
+const weekLabel=w=>short(w)+" au "+short(w+4);
+const each=(a,b)=>Array.from({length:Math.max(0,b-a+1)},(_,i)=>a+i);
+const $=id=>document.getElementById(id);
+let example=0,state,draft=null,selected=null,moveSource=null;
+function easter(y){
+  const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4;
+  const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const v=h+l-7*m+114;
+  return date(y,Math.floor(v/31),v%31+1);
+}
+function holiday(d){
+  const y=obj(d).getUTCFullYear(),e=easter(y);
+  const names={"01-01":"Jour de l’an","05-01":"Fête du Travail","05-08":"Victoire de 1945","07-14":"Fête nationale","08-15":"Assomption","11-01":"Toussaint","11-11":"Armistice","12-25":"Noël"};
+  return names[iso(d).slice(5)] || ({[e+1]:"Lundi de Pâques",[e+39]:"Ascension",[e+50]:"Lundi de Pentecôte"})[d] || "";
+}
+function eligible(d,c){return weekday(d)>=1&&weekday(d)<=5&&!c.rest.includes(weekday(d))&&!holiday(d);}
+function secondTuesday(m){return m+((2-weekday(m)+7)%7)+7;}
+function lastBusiness(m){
+  let d=monthOffset(m,1)-1;
+  while(weekday(d)===0||weekday(d)===6||holiday(d))d--;
+  return d;
+}
+function lastFullWeek(m){
+  let w=monday(monthOffset(m,1)-1);
+  if(w+4>=monthOffset(m,1))w-=7;
+  return w;
+}
+function monthsBetween(a,b){
+  const months=[];
+  for(let m=monthStart(a);m<=b;m=monthOffset(m,1))months.push(m);
+  return months;
+}
+function plan(c,start,defense,recur){
+  const end=lastBusiness(defense);
+  const limit=start+84;
+  const possible=monthsBetween(start,limit).map(secondTuesday).filter(d=>d>=start&&d<=limit&&d<end&&eligible(d,c));
+  const entry=possible.at(-1);
+  if(entry===undefined)throw Error("Aucune rentrée éligible avant le "+full(limit)+". Vérifiez le début de contrat et la session de soutenance.");
+  if(!eligible(end,c))throw Error("La fin de formation correspond à un jour de repos déclaré. Ce cas doit être arbitré avant génération.");
+  if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le scénario.");
+  const mid=entry+Math.ceil((end-entry)/2), lastMonth=monthOffset(defense,-1);
+  const map=new Map([[entry,{kind:"entry",why:"Deuxième mardi du mois de rentrée. Cette journée est verrouillée."}],[end,{kind:"end",why:"Dernier jour ouvré du mois de soutenance. C’est son unique journée de formation."}]]);
+  const decisions=[], weeks=[];
+  for(const value of c.fixed){
+    const d=parse(value);
+    if(d>entry&&d<defense&&eligible(d,c))map.set(d,{kind:"fixed",why:"Date publiée et intégrée au volume cible de formation."});
+  }
+  function tryBlock(m,required){
+    const first=lastFullWeek(m);
+    const candidates=[];
+    for(let w=first;w>=m;w-=7){
+      if(w<=monday(entry)||w+4>=defense||(!required&&w<mid)||w<monthOffset(monthStart(entry),c.duration===12?1:3))continue;
+      const valid=each(w,w+4).filter(d=>eligible(d,c));
+      if(valid.length<2)continue;
+      const bridge=each(w+1,w+3).find(d=>holiday(d));
+      candidates.push({w,valid,bridge});
+    }
+    let pick=candidates.find(w=>!w.bridge) || candidates[0];
+    if(!pick){decisions.push({skip:true,text:"Aucune semaine pleine éligible en "+monthLabel(m)+"."});return;}
+    const additions=pick.valid.filter(d=>!map.has(d));
+    if(map.size+additions.length>c.target){
+      decisions.push({skip:true,text:weekLabel(pick.w)+" · bloc incompatible avec le volume restant."});
+      return;
+    }
+    const rejected=candidates.filter(q=>q.w>pick.w&&q.bridge);
+    for(const q of rejected)decisions.push({skip:true,day:q.bridge,text:weekLabel(q.w)+" · écartée en raison du jour férié ("+holiday(q.bridge)+")."});
+    const why=required ? "Dernière semaine pleine prioritaire avant la soutenance." : "Semaine pleine complémentaire proposée selon la cadence de deux mois.";
+    for(const d of pick.valid){
+      if(!map.has(d)||map.get(d).kind==="ordinary")map.set(d,{kind:"block",why});
+    }
+    weeks.push(pick.w);
+    decisions.push({day:pick.valid[0],text:weekLabel(pick.w)+" · "+(required?"bloc prioritaire avant la soutenance":"complément à deux mois d’intervalle")+(pick.bridge?" · semaine fériée conservée faute d’autre créneau éligible.":".")});
+  }
+  tryBlock(lastMonth,true);
+  const firstRecurring=monday(entry)+7;
+  for(let w=firstRecurring;w<defense;w+=7){
+    const d=w+recur-1;
+    if(d>=defense)continue;
+    if(eligible(d,c)&&!map.has(d))map.set(d,{kind:"ordinary",why:"Jour récurrent à partir de la deuxième semaine de formation.",role:"weekly"});
+  }
+  for(let m=monthOffset(lastMonth,-2);m>=monthStart(mid);m=monthOffset(m,-2)){
+    const remaining=c.target-map.size;
+    const remainingWeeks=Math.max(1,Math.ceil((defense-entry)/7));
+    if(remaining<=Math.max(4,Math.round(remainingWeeks*.18)))break;
+    tryBlock(m,false);
+  }
+  const active=each(firstRecurring,defense-1).filter(d=>eligible(d,c));
+  function inMonth(d,m){return d>=m&&d<monthOffset(m,1);}
+  for(const m of monthsBetween(entry,end)){
+    if([...map.keys()].some(d=>inMonth(d,m)))continue;
+    const d=active.find(d=>inMonth(d,m));
+    if(d!==undefined&&map.size<c.target)map.set(d,{kind:"ordinary",why:"Journée complémentaire pour préserver la continuité mensuelle.",role:"extra"});
+  }
+  function fill(dates,cap){
+    while(map.size<c.target){
+      const counts=new Map();
+      for(const d of map.keys()){const w=monday(d);counts.set(w,(counts.get(w)||0)+1);}
+      const options=dates.filter(d=>{
+        const w=monday(d),count=counts.get(w)||0,possible=each(w,w+4).filter(day=>eligible(day,c)).length;
+        return !map.has(d)&&count<cap&&count+1<possible;
+      });
+      if(!options.length)return;
+      const load=d=>counts.get(monday(d))||0;
+      const nearest=d=>Math.min(56,...[...map].filter(([,entry])=>entry.role==="extra").map(([other])=>Math.abs(d-other)));
+      options.sort((a,b)=>load(a)-load(b)||nearest(b)-nearest(a)||b-a);
+      map.set(options[0],{kind:"ordinary",why:"Jour complémentaire réparti pour atteindre le volume cible.",role:"extra"});
+    }
+  }
+  fill(active.filter(d=>d>=mid),3);
+  fill(active,3);
+  return {c,start,defense,recur,entry,end,limit,mid,contractEnd:end+56,possible,decisions,weeks,map};
+}
+function setMessage(id,value,kind=""){
+  $(id).textContent=value;
+  $(id).className="feedback "+kind;
+}
+function legend(){
+  return Object.entries(kinds).filter(([kind])=>kind!=="out").map(([kind,[label]])=>
+    '<span><i aria-hidden="true" class="swatch '+kind+'"></i>'+label+'</span>'
+  ).join("");
+}
+function info(d){
+  if(d<state.start||d>state.contractEnd)return {kind:"out",why:"Cette date se situe hors du contrat."};
+  if(state.map.has(d))return state.map.get(d);
+  if(holiday(d))return {kind:"holiday",why:holiday(d)+". Cette date est exclue de la planification de formation."};
+  if(state.c.rest.includes(weekday(d)))return {kind:"rest",why:"Jour de repos déclaré par l’entreprise."};
+  if(weekday(d)===0||weekday(d)===6)return {kind:"company",why:"Jour potentiellement travaillé en entreprise. La formation est planifiée du lundi au vendredi."};
+  if(d<state.entry||d>state.end)return {kind:"company",why:"Jour en entreprise en dehors de la période de formation."};
+  if(d>=state.defense)return {kind:"company",why:"Mois de soutenance. Seul le dernier jour ouvré est prévu en formation."};
+  return {kind:"company",why:"Jour en entreprise dans le calendrier prévisionnel."};
+}
+function grid(m,interactive){
+  const head=daysShort.map(d=>'<span class="weekday">'+d.toLowerCase()+'</span>').join("");
+  return head+each(monday(m),monday(monthOffset(m,1)-1)+6).map(d=>{
+    const content="<strong>"+obj(d).getUTCDate()+"</strong>";
+    if(monthStart(d)!==m)return '<span class="day out" aria-hidden="true">'+content+'</span>';
+    const item=info(d),label=kinds[item.kind][0],title=full(d)+' · '+label;
+    if(!interactive)return '<span class="day '+item.kind+'" title="'+title+'">'+content+'</span>';
+    return '<button type="button" class="day '+item.kind+'" data-day="'+d+'" title="'+title+'" aria-label="'+title+'" aria-pressed="'+(d===selected)+'">'+content+'</button>';
+  }).join("");
+}
+function calendarMonths(interactive){
+  return monthsBetween(state.start,state.contractEnd).map(m=>
+    '<section class="month"><h3>'+monthLabel(m)+'</h3><div class="grid">'+grid(m,interactive)+'</div></section>'
+  ).join("");
+}
+function renderCalendar(){
+  const n=state.map.size,target=state.c.target,percent=Math.round(n/target*100);
+  $("stats").innerHTML='<tbody><tr><th scope="row">Nombre d’heures</th><td><strong>'+n*hours+' h</strong> / '+target*hours+' h</td></tr><tr><th scope="row">Pourcentage</th><td><strong>'+percent+' %</strong></td></tr></tbody>';
+  setMessage("calendar-message",draft?"Dates recalculées. Générez le nouveau calendrier pour appliquer ces dates.":n===target?"":n>target
+    ? (n-target)*hours+" h au-dessus de la cible. Retirez une journée ajoutée pour revenir au volume cible."
+    : (target-n)*hours+" h restent à placer dans le cadre des règles de génération.","warn");
+  $("shortcuts").innerHTML=[
+    ["Aller à la rentrée",state.entry],["Aller à la dernière semaine pleine",state.weeks[0]],["Aller à la soutenance",state.end]
+  ].filter(([,d])=>d!==undefined).map(([label,d])=>'<button type="button" class="ghost" data-jump="'+d+'">'+label+'</button>').join("");
+  $("calendar").innerHTML=calendarMonths(true);
+  renderChoice();
+}
+function selectDay(d,{jump=false}={}){
+  selected=d;
+  const current=$("calendar").querySelector('[aria-pressed="true"]');
+  const next=$("calendar").querySelector('[data-day="'+d+'"]');
+  current?.setAttribute("aria-pressed","false");
+  next?.setAttribute("aria-pressed","true");
+  $("choice").parentElement.open=true;
+  renderChoice();
+  if(jump&&next){
+    next.scrollIntoView({block:"center",behavior:"instant"});
+    next.focus({preventScroll:true});
+  }
+}
+function renderChoice(){
+  if(selected===null||selected<state.start||selected>state.contractEnd){
+    $("choice").innerHTML="<p>Sélectionnez une journée pour comprendre sa planification.</p>";
+    $("edit").innerHTML=moveSource!==null?'<span class="muted">Journée à déplacer · '+full(moveSource)+'</span><button id="cancel-move" class="ghost">Annuler</button>':"";
+    return;
+  }
+  const item=info(selected),canAdd=monday(selected)===monday(state.entry)&&selected>=state.entry&&selected<state.defense&&eligible(selected,state.c)&&!state.map.has(selected);
+  $("choice").innerHTML="<p><strong>"+full(selected)+" · "+kinds[item.kind][0]+"</strong></p><p class='muted'>"+item.why+"</p>";
+  if(moveSource!==null){
+    $("edit").innerHTML='<span class="muted">Déplacer le '+full(moveSource)+'</span><button id="finish-move" class="action">Déplacer ici</button><button id="cancel-move" class="ghost">Annuler</button>';
+    return;
+  }
+  $("edit").innerHTML=item.kind==="ordinary"
+    ? '<button id="move" class="ghost">Déplacer cette journée</button>'+(item.role==="manual"?'<button id="remove" class="ghost">Retirer l’ajout manuel</button>':"")
+    : canAdd?'<button id="add" class="ghost">Ajouter un jour en semaine de rentrée</button>':"";
+}
+function renderDates(planDates){
+  $("entry-date").value=iso(planDates.entry);
+  $("end-date").value=iso(planDates.end);
+  $("end-choice").value=iso(planDates.contractEnd);
+  $("limit-start").textContent="Date limite de rentrée · "+full(planDates.limit);
+  $("limit-end").textContent="Date recommandée · "+full(planDates.end+56);
+  $("explain").innerHTML=
+    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La dernière rentrée possible est le <strong>'+full(planDates.entry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrées compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
+    '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
+    '<details open><summary>Mois de soutenance et fin de contrat</summary><p>Le <strong>'+full(planDates.end)+'</strong> est le dernier jour ouvré du mois. C’est la seule journée de formation qui y est générée. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
+    '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir le complément entre semaines à deux ou trois jours et semaines pleines supplémentaires selon les besoins.</li></ol><p>Milieu du parcours le <strong>'+full(planDates.mid)+'</strong>. Cible de démonstration · '+planDates.c.target+' jours × 7 h.</p></details>'+
+    '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Pour éviter les ponts, le générateur cherche d’abord une autre semaine du même mois.</p></details>'+
+    '<details><summary>Continuité de formation</summary><p>Les mois complets de la période de formation doivent contenir au moins une journée. Les périodes avant la rentrée et après la formation peuvent rester en entreprise dans les limites prévues.</p></details>';
+}
+function render(){
+  $("weeks").innerHTML=state.decisions.map(d=>'<div class="decision '+(d.skip?"skipped":"")+'">'+
+    (d.day===undefined?d.text:'<button type="button" data-jump="'+d.day+'">'+d.text+'</button>')+'</div>').join("")+
+    '<p class="muted">Les blocs supplémentaires remontent par pas de deux mois, dans la seconde moitié du parcours.</p>';
+  $("fixed-summary").textContent=[...state.map.values()].filter(x=>x.kind==="fixed").length+" date(s) fixe(s) déjà comprises dans le volume.";
+  renderCalendar();
+}
+function load(i){
+  example=i;
+  const c=cases[i];
+  $("scenarios").innerHTML=cases.map((q,k)=>'<option value="'+k+'" '+(k===i?"selected":"")+'>'+q.name+'</option>').join("");
+  $("product").textContent=c.tag+" · "+c.subtitle;
+  $("case-description").textContent=c.description;
+  $("start").value=c.start;
+  $("defense-year").innerHTML=Array.from({length:16},(_,n)=>2026+n).map(y=>'<option>'+y+'</option>').join("");
+  $("defense-month").innerHTML=Array.from({length:12},(_,n)=>'<option value="'+(n+1)+'">'+fmt(date(2026,n+1,1),{month:"long"})+'</option>').join("");
+  const [year,month]=c.defense.split("-").map(Number);
+  $("defense-year").value=year;
+  $("defense-month").value=month;
+  $("weekday").innerHTML=dayNames.map((day,n)=>n>=1&&n<=5&&!c.rest.includes(n)?'<option value="'+n+'">'+day+'</option>':"").join("");
+  $("weekday").value=c.weekday;
+  $("rest").innerHTML=dayNames.slice(1).concat(dayNames[0]).map(day=>'<span><input type="checkbox" aria-label="'+day+'" disabled '+(c.rest.includes(dayNames.indexOf(day))?'checked':'')+'>'+day+'</span>').join("");
+  if(generateDates(true))activateCalendar();
+}
+function generateDates(quiet=false){
+  try{
+    const start=parse($("start").value),defense=date(Number($("defense-year").value),Number($("defense-month").value),1);
+    if(!Number.isFinite(start))throw Error("Renseignez la date de début du contrat.");
+    draft=plan(cases[example],start,defense,Number($("weekday").value));
+    renderDates(draft);
+    $("ack").hidden=true;
+    $("ack-input").checked=false;
+    setMessage("date-message",quiet?"":"Dates calculées. Vous pouvez générer le nouveau calendrier.");
+    if(!quiet)renderCalendar();
+    return true;
+  }catch(e){setMessage("date-message",e.message+" Le dernier calendrier généré reste affiché.","bad");return false;}
+}
+function activateCalendar(){
+  state=draft;
+  draft=null;
+  selected=null;
+  moveSource=null;
+  $("publish").disabled=false;
+  setMessage("fixed-message","");
+  render();
+}
+function validMove(from,to){
+  if(to<state.entry||to>=state.defense||state.map.has(to)||!eligible(to,state.c))return "Choisissez un jour ouvré éligible et libre avant le mois de soutenance.";
+  const remains=[...state.map.keys()].filter(d=>d!==from);
+  if(monthStart(from)!==monthStart(to)&&!remains.some(d=>monthStart(d)===monthStart(from)))return "Ce déplacement laisserait un mois sans formation.";
+  const w=monday(to),days=each(w,w+4).filter(d=>eligible(d,state.c));
+  const closed=days.every(d=>d===to||remains.includes(d));
+  if(closed&&w<state.mid)return "Ce déplacement créerait une semaine pleine dans la première moitié du parcours.";
+  return "";
+}
+$("legend").innerHTML=legend();$("pdf-legend").innerHTML=legend();
+$("scenarios").addEventListener("change",e=>load(Number(e.target.value)));
+$("form").addEventListener("submit",e=>{e.preventDefault();generateDates();});
+$("regenerate").onclick=()=>{
+  if(!draft){
+    const chosenEnd=$("end-choice").value;
+    const previousEnd=iso(state.contractEnd);
+    const sameDates=parse($("start").value)===state.start&&date(Number($("defense-year").value),Number($("defense-month").value),1)===state.defense;
+    if(!generateDates(true))return;
+    if(sameDates&&chosenEnd!==iso(draft.contractEnd))$("end-choice").value=chosenEnd||previousEnd;
+  }
+  if(!applyEnd())return;
+  activateCalendar();
+  setMessage("calendar-message","Nouveau calendrier généré.");
+};
+function applyEnd(){
+  const planDates=draft??state,value=parse($("end-choice").value),limit=planDates.end+56;
+  if(!Number.isFinite(value)||value<planDates.end||value>limit){
+    setMessage("date-message","Choisissez une fin de contrat entre le "+full(planDates.end)+" et le "+full(limit)+".","bad");return false;
+  }
+  if(planDates.contractEnd!==value)$("ack-input").checked=false;
+  planDates.contractEnd=value;
+  $("ack").hidden=!(value<limit&&[2,3].includes(planDates.c.level));
+  if(value<limit)setMessage("date-message","Fin de contrat retenue le "+full(value)+". Date recommandée · "+full(limit)+".",$("ack").hidden?"":"warn");
+  return true;
+}
+$("apply-end").onclick=()=>{if(applyEnd())renderCalendar();};
+$("ack-input").onchange=()=>setMessage("date-message",$("ack-input").checked?"Écart à la date recommandée pris en compte.":"Confirmez la prise en compte de la date recommandée.","warn");
+$("publish").onclick=()=>{
+  const pair=[...state.map].filter(([d,x])=>x.role==="extra"&&d<state.defense).reverse().map(([d])=>[d,each(monday(d),monday(d)+4).find(to=>to>=state.entry&&to<state.defense&&!validMove(d,to))]).find(([,to])=>to!==undefined);
+  const already=[...state.map].find(([d,x])=>x.kind==="ordinary"&&d>state.mid);
+  if(!pair&&!already){setMessage("fixed-message","Aucune journée ordinaire disponible pour la simulation.","warn");return;}
+  const [from,to]=pair??[already[0],already[0]];
+  state.map.delete(from);state.map.set(to,{kind:"fixed",why:"Nouvelle date fixe. Elle remplace la formation du "+short(from)+" et conserve le volume planifié."});
+  selected=to;
+  $("publish").disabled=true;
+  setMessage("fixed-message",from===to?"Le "+full(to)+" devient non modifiable. Le volume reste identique.":"Le "+short(to)+" devient non modifiable et remplace le "+short(from)+". Le volume reste identique.");
+  render();
+  selectDay(to,{jump:true});
+};
+document.addEventListener("click",event=>{
+  const button=event.target.closest("button");if(!button)return;
+  if(button.dataset.day!==undefined)selectDay(Number(button.dataset.day));
+  if(button.dataset.jump!==undefined)selectDay(Number(button.dataset.jump),{jump:true});
+  if(button.id==="move"){moveSource=selected;renderChoice();}
+  if(button.id==="cancel-move"){moveSource=null;renderCalendar();}
+  if(button.id==="add"){
+    state.map.set(selected,{kind:"ordinary",why:"Ajout manuel du RE en semaine de rentrée.",role:"manual"});renderCalendar();
+  }
+  if(button.id==="remove"){state.map.delete(selected);renderCalendar();}
+  if(button.id==="finish-move"){
+    const problem=validMove(moveSource,selected);
+    if(problem){setMessage("calendar-message",problem,"bad");return;}
+    const from=moveSource,item=state.map.get(from);
+    state.map.delete(from);state.map.set(selected,{...item,why:"Déplacement manuel du "+short(from)+" au "+short(selected)+"."});
+    moveSource=null;renderCalendar();
+  }
+});
+$("preview").onclick=()=>{
+  $("pdf-summary").textContent=state.c.name+" · Contrat du "+full(state.start)+" au "+full(state.contractEnd)+" · "+(state.map.size*hours)+" h planifiées";
+  $("pdf-grid").innerHTML=calendarMonths(false);
+  $("document").showModal();
+};
+$("close").onclick=()=>$("document").close();
+$("print").onclick=()=>window.print();
+load(0);
+</script>
+</body>
+</html>
