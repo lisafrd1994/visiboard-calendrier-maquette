@@ -67,7 +67,7 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <details open><summary>Journée sélectionnée</summary><div id="choice" class="choice" aria-live="polite"></div><div id="edit" class="actions edit"></div></details>
 <details open><summary>Pourquoi ces semaines pleines ?</summary><div id="weeks"></div></details>
 <details><summary>Jours non modifiables</summary><p id="fixed-summary"></p><button id="publish" class="ghost" type="button">Simuler une nouvelle date fixe</button><div id="fixed-message" class="feedback" role="status"></div></details>
-<details><summary>Hypothèses de la maquette</summary><p>Les volumes et les dates fixes sont des données de démonstration. La répartition du complément et le jour ordinaire à remplacer restent à valider. Une occurrence récurrente fériée est sautée dans cet exemple.</p></details>
+<details><summary>Hypothèses de la maquette</summary><p>La maquette utilise une base de 35 h par semaine et des journées de formation de 7 h. Les dates fixes sont des données de démonstration. La répartition du complément et le jour ordinaire à remplacer restent à valider. Une occurrence récurrente fériée est sautée dans cet exemple.</p></details>
 </aside>
 <section class="calendar-pane" aria-label="Calendrier de formation prévisionnel">
 <div class="section-head"><button type="button" id="regenerate" class="action">Générer un nouveau calendrier</button><button id="preview" type="button" class="ghost">Aperçu du PDF</button></div>
@@ -81,10 +81,12 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <dialog id="document" class="modal"><div class="section-head"><h2>Calendrier prévisionnel de formation</h2><div class="no-print"><button id="print" class="action">Imprimer / PDF</button> <button id="close" class="ghost">Fermer</button></div></div><p id="pdf-summary"></p><div class="legend" id="pdf-legend"></div><div class="print-grid" id="pdf-grid"></div></dialog>
 <script>
 const cases = [
-  {name:"Communication visuelle", tag:"Parcours complet", subtitle:"Cas de départ · 945 h", description:"Le contrat commence en décembre 2026. Observez le calcul de la rentrée et la répartition des heures avant la soutenance de février 2029.", start:"2026-12-07", defense:"2029-02", weekday:3, rest:[0,6], target:135, fixed:["2029-01-09","2029-01-10"], level:3, duration:24},
-  {name:"Parcours réduit", tag:"Réduction de formation", subtitle:"Jours de repos lundi et dimanche · 420 h", description:"Ce cas reprend le rythme d’entreprise de Casa Serena. Le samedi est travaillé en entreprise. Une semaine pleine de formation reste limitée au mardi, mercredi, jeudi et vendredi.", start:"2026-11-17", defense:"2027-12", weekday:2, rest:[0,1], target:60, fixed:["2027-10-14"], level:2, duration:12},
-  {name:"Semaine avec un jour férié", tag:"Cas du pont", subtitle:"Dernière semaine de décembre · Noël un mardi", description:"La soutenance est en janvier 2030. La dernière semaine complète de décembre contient Noël. Le journal indique la semaine écartée et explique où le bloc est placé.", start:"2028-11-13", defense:"2030-01", weekday:3, rest:[0,6], target:76, fixed:["2029-11-15"], level:3, duration:12}
+  {name:"Formation d’un an", tag:"Sans jour de formation non modifiable", subtitle:"Repos le dimanche et le lundi", description:"Ce parcours illustre une semaine pleine du mardi au vendredi et l’évitement de la semaine de Noël avant une soutenance en janvier.", start:"2028-11-21", defense:"2030-01", weekday:3, rest:[0,1], fixed:[], level:2, duration:12},
+  {name:"Formation de deux ans", tag:"Avec jours de formation non modifiables", subtitle:"Repos le dimanche et le lundi", description:"Les jours non modifiables sont inclus dans le volume du contrat. Le samedi peut être travaillé en entreprise. La formation a lieu sur les jours éligibles du mardi au vendredi.", start:"2026-12-07", defense:"2029-02", weekday:3, rest:[0,1], fixed:["2029-01-09","2029-01-10"], level:3, duration:24}
 ];
+const workweekHours=35;
+const minimumShare=.25;
+const formatHours=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:2});
 const kinds={
   entry:["Jour de rentrée en formation","Rentrée"],
   ordinary:["Jour de formation","Formation"],
@@ -145,7 +147,7 @@ function monthsBetween(a,b){
   for(let m=monthStart(a);m<=b;m=monthOffset(m,1))months.push(m);
   return months;
 }
-function plan(c,start,defense,recur){
+function calculateDates(c,start,defense,recur){
   const end=lastBusiness(defense);
   const limit=start+84;
   const possible=monthsBetween(start,limit).map(secondTuesday).filter(d=>d>=start&&d<=limit&&d<end&&eligible(d,c));
@@ -153,6 +155,18 @@ function plan(c,start,defense,recur){
   if(entry===undefined)throw Error("Aucune rentrée éligible avant le "+full(limit)+". Vérifiez le début de contrat et la session de soutenance.");
   if(!eligible(end,c))throw Error("La fin de formation correspond à un jour de repos déclaré. Ce cas doit être arbitré avant génération.");
   if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le scénario.");
+  return {c,start,defense,recur,entry,end,limit,possible,contractEnd:end+56};
+}
+function contractVolume(start,contractEnd){
+  const days=contractEnd-start+1;
+  const minimumHours=days*(workweekHours*minimumShare/7);
+  const target=Math.ceil(minimumHours/hours);
+  return {days,minimumHours,target};
+}
+function plan(dates){
+  const {c,start,defense,recur,entry,end,contractEnd}=dates;
+  const volume=contractVolume(start,contractEnd);
+  const {target}=volume;
   const mid=entry+Math.ceil((end-entry)/2), lastMonth=monthOffset(defense,-1);
   const map=new Map([[entry,{kind:"entry",why:"Deuxième mardi du mois de rentrée. Cette journée est verrouillée."}],[end,{kind:"end",why:"Dernier jour ouvré du mois de soutenance. C’est son unique journée de formation."}]]);
   const decisions=[], weeks=[];
@@ -173,7 +187,7 @@ function plan(c,start,defense,recur){
     let pick=candidates.find(w=>!w.bridge) || candidates[0];
     if(!pick){decisions.push({skip:true,text:"Aucune semaine pleine éligible en "+monthLabel(m)+"."});return;}
     const additions=pick.valid.filter(d=>!map.has(d));
-    if(map.size+additions.length>c.target){
+    if(map.size+additions.length>target){
       decisions.push({skip:true,text:weekLabel(pick.w)+" · bloc incompatible avec le volume restant."});
       return;
     }
@@ -194,7 +208,7 @@ function plan(c,start,defense,recur){
     if(eligible(d,c)&&!map.has(d))map.set(d,{kind:"ordinary",why:"Jour récurrent à partir de la deuxième semaine de formation.",role:"weekly"});
   }
   for(let m=monthOffset(lastMonth,-2);m>=monthStart(mid);m=monthOffset(m,-2)){
-    const remaining=c.target-map.size;
+    const remaining=target-map.size;
     const remainingWeeks=Math.max(1,Math.ceil((defense-entry)/7));
     if(remaining<=Math.max(4,Math.round(remainingWeeks*.18)))break;
     tryBlock(m,false);
@@ -204,10 +218,10 @@ function plan(c,start,defense,recur){
   for(const m of monthsBetween(entry,end)){
     if([...map.keys()].some(d=>inMonth(d,m)))continue;
     const d=active.find(d=>inMonth(d,m));
-    if(d!==undefined&&map.size<c.target)map.set(d,{kind:"ordinary",why:"Journée complémentaire pour préserver la continuité mensuelle.",role:"extra"});
+    if(d!==undefined&&map.size<target)map.set(d,{kind:"ordinary",why:"Journée complémentaire pour préserver la continuité mensuelle.",role:"extra"});
   }
   function fill(dates,cap){
-    while(map.size<c.target){
+    while(map.size<target){
       const counts=new Map();
       for(const d of map.keys()){const w=monday(d);counts.set(w,(counts.get(w)||0)+1);}
       const options=dates.filter(d=>{
@@ -223,7 +237,8 @@ function plan(c,start,defense,recur){
   }
   fill(active.filter(d=>d>=mid),3);
   fill(active,3);
-  return {c,start,defense,recur,entry,end,limit,mid,contractEnd:end+56,possible,decisions,weeks,map};
+  if(map.size>target)throw Error("Les journées imposées et le rythme récurrent dépassent le volume cible avec ces dates.");
+  return {...dates,volume,mid,decisions,weeks,map};
 }
 function setMessage(id,value,kind=""){
   $(id).textContent=value;
@@ -260,7 +275,7 @@ function calendarMonths(interactive){
   ).join("");
 }
 function renderCalendar(){
-  const n=state.map.size,target=state.c.target,percent=Math.round(n/target*100);
+  const n=state.map.size,{target,minimumHours}=state.volume,percent=formatHours.format(n/target*100);
   $("stats").innerHTML='<tbody><tr><th scope="row">Nombre d’heures</th><td><strong>'+n*hours+' h</strong> / '+target*hours+' h</td></tr><tr><th scope="row">Pourcentage</th><td><strong>'+percent+' %</strong></td></tr></tbody>';
   setMessage("calendar-message",draft?"Dates recalculées. Générez le nouveau calendrier pour appliquer ces dates.":n===target?"":n>target
     ? (n-target)*hours+" h au-dessus de la cible. Retirez une journée ajoutée pour revenir au volume cible."
@@ -306,11 +321,12 @@ function renderDates(planDates){
   $("end-choice").value=iso(planDates.contractEnd);
   $("limit-start").textContent="Date limite de rentrée · "+full(planDates.limit);
   $("limit-end").textContent="Date recommandée · "+full(planDates.end+56);
+  const {days,minimumHours,target}=contractVolume(planDates.start,planDates.contractEnd);
   $("explain").innerHTML=
     '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La dernière rentrée possible est le <strong>'+full(planDates.entry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrées compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
     '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
     '<details open><summary>Mois de soutenance et fin de contrat</summary><p>Le <strong>'+full(planDates.end)+'</strong> est le dernier jour ouvré du mois. C’est la seule journée de formation qui y est générée. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
-    '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir le complément entre semaines à deux ou trois jours et semaines pleines supplémentaires selon les besoins.</li></ol><p>Milieu du parcours le <strong>'+full(planDates.mid)+'</strong>. Cible de démonstration · '+planDates.c.target+' jours × 7 h.</p></details>'+
+    '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir le complément entre semaines à deux ou trois jours et semaines pleines supplémentaires selon les besoins.</li></ol><p>Contrat de <strong>'+days+' jours calendaires</strong>, dates de début et de fin incluses. Sur une base de 35 h par semaine, 25 % représentent <strong>'+formatHours.format(minimumHours)+' h</strong>. La maquette arrondit au jour complet supérieur, soit <strong>'+target+' jours × 7 h = '+target*hours+' h</strong>. Le compteur atteint 100 % quand ces journées sont placées.</p></details>'+
     '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Pour éviter les ponts, le générateur cherche d’abord une autre semaine du même mois.</p></details>'+
     '<details><summary>Continuité de formation</summary><p>Les mois complets de la période de formation doivent contenir au moins une journée. Les périodes avant la rentrée et après la formation peuvent rester en entreprise dans les limites prévues.</p></details>';
 }
@@ -336,13 +352,13 @@ function load(i){
   $("weekday").innerHTML=dayNames.map((day,n)=>n>=1&&n<=5&&!c.rest.includes(n)?'<option value="'+n+'">'+day+'</option>':"").join("");
   $("weekday").value=c.weekday;
   $("rest").innerHTML=dayNames.slice(1).concat(dayNames[0]).map(day=>'<span><input type="checkbox" aria-label="'+day+'" disabled '+(c.rest.includes(dayNames.indexOf(day))?'checked':'')+'>'+day+'</span>').join("");
-  if(generateDates(true))activateCalendar();
+  if(generateDates(true))activateCalendar(plan(draft));
 }
 function generateDates(quiet=false){
   try{
     const start=parse($("start").value),defense=date(Number($("defense-year").value),Number($("defense-month").value),1);
     if(!Number.isFinite(start))throw Error("Renseignez la date de début du contrat.");
-    draft=plan(cases[example],start,defense,Number($("weekday").value));
+    draft=calculateDates(cases[example],start,defense,Number($("weekday").value));
     renderDates(draft);
     $("ack").hidden=true;
     $("ack-input").checked=false;
@@ -351,12 +367,12 @@ function generateDates(quiet=false){
     return true;
   }catch(e){setMessage("date-message",e.message+" Le dernier calendrier généré reste affiché.","bad");return false;}
 }
-function activateCalendar(){
-  state=draft;
+function activateCalendar(calendar){
+  state=calendar;
   draft=null;
   selected=null;
   moveSource=null;
-  $("publish").disabled=false;
+  $("publish").disabled=state.c.fixed.length===0;
   setMessage("fixed-message","");
   render();
 }
@@ -372,30 +388,52 @@ function validMove(from,to){
 $("legend").innerHTML=legend();$("pdf-legend").innerHTML=legend();
 $("scenarios").addEventListener("change",e=>load(Number(e.target.value)));
 $("form").addEventListener("submit",e=>{e.preventDefault();generateDates();});
-$("regenerate").onclick=()=>{
-  if(!draft){
-    const chosenEnd=$("end-choice").value;
-    const previousEnd=iso(state.contractEnd);
-    const sameDates=parse($("start").value)===state.start&&date(Number($("defense-year").value),Number($("defense-month").value),1)===state.defense;
-    if(!generateDates(true))return;
-    if(sameDates&&chosenEnd!==iso(draft.contractEnd))$("end-choice").value=chosenEnd||previousEnd;
+function readDatesWithChosenEnd(){
+  const start=parse($("start").value);
+  if(!Number.isFinite(start))throw Error("Renseignez la date de début du contrat.");
+  const defense=date(Number($("defense-year").value),Number($("defense-month").value),1);
+  const dates=calculateDates(cases[example],start,defense,Number($("weekday").value));
+  const displayed=draft??state;
+  const typedEnd=parse($("end-choice").value);
+  // An untouched end from a different session should follow its new default.
+  const chosenEnd=defense!==displayed.defense&&typedEnd===displayed.contractEnd ? dates.contractEnd : typedEnd;
+  if(!Number.isFinite(chosenEnd)||chosenEnd<dates.end||chosenEnd>dates.contractEnd){
+    throw Error("Choisissez une fin de contrat entre le "+full(dates.end)+" et le "+full(dates.contractEnd)+".");
   }
-  if(!applyEnd())return;
-  activateCalendar();
-  setMessage("calendar-message","Nouveau calendrier généré.");
-};
-function applyEnd(){
-  const planDates=draft??state,value=parse($("end-choice").value),limit=planDates.end+56;
-  if(!Number.isFinite(value)||value<planDates.end||value>limit){
-    setMessage("date-message","Choisissez une fin de contrat entre le "+full(planDates.end)+" et le "+full(limit)+".","bad");return false;
-  }
-  if(planDates.contractEnd!==value)$("ack-input").checked=false;
-  planDates.contractEnd=value;
-  $("ack").hidden=!(value<limit&&[2,3].includes(planDates.c.level));
-  if(value<limit)setMessage("date-message","Fin de contrat retenue le "+full(value)+". Date recommandée · "+full(limit)+".",$("ack").hidden?"":"warn");
-  return true;
+  return {...dates,contractEnd:chosenEnd};
 }
-$("apply-end").onclick=()=>{if(applyEnd())renderCalendar();};
+function showEndChoice(dates){
+  const limit=dates.end+56;
+  $("ack").hidden=!(dates.contractEnd<limit&&[2,3].includes(dates.c.level));
+  if(!$("ack").hidden){
+    setMessage("date-message","Fin de contrat retenue le "+full(dates.contractEnd)+". Date recommandée · "+full(limit)+".","warn");
+  }
+}
+$("regenerate").onclick=()=>{
+  try{
+    const dates=readDatesWithChosenEnd();
+    const calendar=plan(dates);
+    if(dates.contractEnd!==(draft??state).contractEnd)$("ack-input").checked=false;
+    renderDates(dates);
+    setMessage("date-message","");
+    showEndChoice(dates);
+    activateCalendar(calendar);
+    if(state.map.size===state.volume.target)setMessage("calendar-message","Calendrier régénéré à partir des nouvelles dates et du volume recalculé.");
+  }catch(e){
+    setMessage("calendar-message",e.message+" Le dernier calendrier généré reste affiché.","bad");
+  }
+};
+$("apply-end").onclick=()=>{
+  try{
+    const dates=readDatesWithChosenEnd();
+    $("ack-input").checked=false;
+    draft=dates;
+    renderDates(dates);
+    setMessage("date-message","Fin de contrat prise en compte. Générez le nouveau calendrier pour appliquer le volume recalculé.");
+    showEndChoice(dates);
+    renderCalendar();
+  }catch(e){setMessage("date-message",e.message,"bad");}
+};
 $("ack-input").onchange=()=>setMessage("date-message",$("ack-input").checked?"Écart à la date recommandée pris en compte.":"Confirmez la prise en compte de la date recommandée.","warn");
 $("publish").onclick=()=>{
   const pair=[...state.map].filter(([d,x])=>x.role==="extra"&&d<state.defense).reverse().map(([d])=>[d,each(monday(d),monday(d)+4).find(to=>to>=state.entry&&to<state.defense&&!validMove(d,to))]).find(([,to])=>to!==undefined);
