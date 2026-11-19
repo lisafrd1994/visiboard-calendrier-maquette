@@ -22,7 +22,7 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 .calendar-pane{min-width:0}.calendar-pane .section-head{padding-bottom:12px;border-bottom:1px solid #eee}.legend{display:flex;gap:7px 15px;flex-wrap:wrap;margin:14px 0 10px}.legend span{display:inline-flex;align-items:center;gap:5px;font-size:12px}.swatch{width:15px;height:15px;border:1px solid #0002;display:inline-block}
 .year-grid,.print-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:26px 24px;margin-top:18px}.month h3:first-letter{text-transform:uppercase}.month h3{margin-bottom:7px;font-size:22px}
 .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid #ccc;border-left:1px solid #ccc}.weekday,.day{border:0;border-right:1px solid #0002;border-bottom:1px solid #0002;padding:7px 6px;min-width:0;min-height:33px;text-align:left}.weekday{font-size:12px;font-weight:700;background:#fff}.day strong{font-size:13px;font-weight:400}.day:hover:not(.out),.day[aria-pressed=true]{box-shadow:inset 0 0 0 2px #1c4771}.day[aria-pressed=true]{font-weight:bold}.day[aria-pressed=true] strong{font-weight:700}
-.company{background:#fff48a;color:#302a12}.rest{background:#d7d7d7;color:#353535}.holiday{background:#c4c4c4;color:#242424}.out{background:#ededed;color:#656565}.ordinary{background:#b8dff1;color:#15394c}.block{background:#77bcda;color:#102f40}.entry{background:#a7d6b6;color:#183d24}.fixed{background:#f0b3aa;color:#52241e}.end{background:#d8c4e9;color:#452a58}
+.company{background:#fff754;color:#242424}.rest,.holiday,.out{background:#aaa;color:#242424}.ordinary,.block,.entry,.end{background:#1080b3;color:#000}.fixed{background:#ff0101;color:#000}
 .decision{margin:5px 0;padding:5px 7px;border-left:3px solid #77bcda;background:#f5f8fb}.decision.skipped{border-color:#c4841a;background:#fff7e4}.decision button{border:0;background:none;color:#174f81;padding:0;text-align:left;text-decoration:underline;line-height:inherit}.decision button:hover{color:#102f55}
 .feedback{font-size:13px;background:#eaf5ed;color:#21572e;padding:5px 8px;margin-top:7px}.feedback:empty{display:none}.warn{background:#fff4da;color:#624600}.bad{background:#f9e5e5;color:#872222}
 .modal{width:min(940px,96vw);max-height:90vh;border:1px solid #aaa;padding:15px}.modal::backdrop{background:#0006}.print-grid{gap:10px}.print-grid .weekday,.print-grid .day{min-height:22px;padding:3px}.print-grid h3{font-size:15px}
@@ -299,7 +299,11 @@ function setMessage(id,value,kind=""){
   $(id).className="feedback "+kind;
 }
 function legend(){
-  return Object.entries(kinds).filter(([kind])=>kind!=="out").map(([kind,[label]])=>
+  return [
+    ["company","Jours en entreprise"],
+    ["ordinary","Jours en formation"],
+    ["fixed","Jours de formation obligatoires (non modifiables)"]
+  ].map(([kind,label])=>
     '<span><i aria-hidden="true" class="swatch '+kind+'"></i>'+label+'</span>'
   ).join("");
 }
