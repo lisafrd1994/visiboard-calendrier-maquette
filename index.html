@@ -210,11 +210,15 @@ function getFixedSchedule(c,entry,defense){
   const dates=listed.filter(d=>d>=entry&&d<defense&&eligible(d,c));
   return {dates,configured:Boolean(configured)};
 }
+function firstExtraMonth(entry,duration){
+  return monthOffset(entry,duration===12?1:3);
+}
 function plan(dates){
   const {c,start,defense,recur,entry,end,contractEnd}=dates;
   const volume=contractVolume(start,contractEnd);
   const {target}=volume;
   const mid=entry+Math.ceil((end-entry)/2), lastMonth=monthOffset(defense,-1);
+  const extraStart=firstExtraMonth(entry,c.duration);
   const map=new Map([[entry,{kind:"entry",why:(entry===dates.autoEntry?"Deuxième mardi du mois de rentrée.":"Date de rentrée sélectionnée dans le formulaire.")+" Cette journée est verrouillée dans le calendrier."}],[end,{kind:"end",why:(end===dates.autoEnd?"Dernier jour ouvré du mois de soutenance.":"Date de fin de formation sélectionnée dans le mois de soutenance.")+" C’est l’unique journée de formation de ce mois."}]]);
   const decisions=[], weeks=[];
   const fixedSchedule=getFixedSchedule(c,entry,defense);
@@ -232,7 +236,7 @@ function plan(dates){
     const first=lastFullWeek(m);
     const candidates=[];
     for(let w=first;w>=m;w-=7){
-      if(w<=monday(entry)||w+4>=defense||(!required&&w<mid)||w<monthOffset(monthStart(entry),c.duration===12?1:3))continue;
+      if(w<=monday(entry)||w+4>=defense||(!required&&w<mid)||w<extraStart)continue;
       const valid=each(w,w+4).filter(d=>eligible(d,c));
       if(valid.length<2)continue;
       const bridge=each(w+1,w+3).find(d=>holiday(d));
@@ -267,30 +271,43 @@ function plan(dates){
     if(remaining<=Math.max(4,Math.round(remainingWeeks*.18)))break;
     tryBlock(m,false);
   }
-  const active=each(firstRecurring,defense-1).filter(d=>eligible(d,c));
+  const active=each(Math.max(firstRecurring,extraStart),defense-1).filter(d=>eligible(d,c));
   function inMonth(d,m){return d>=m&&d<monthOffset(m,1);}
   for(const m of monthsBetween(entry,end)){
     if([...map.keys()].some(d=>inMonth(d,m)))continue;
     const d=active.find(d=>inMonth(d,m));
     if(d!==undefined&&map.size<target)map.set(d,{kind:"ordinary",why:"Journée complémentaire pour préserver la continuité mensuelle.",role:"extra"});
   }
-  function fill(dates,cap){
-    while(map.size<target){
-      const counts=new Map();
-      for(const d of map.keys()){const w=monday(d);counts.set(w,(counts.get(w)||0)+1);}
-      const options=dates.filter(d=>{
-        const w=monday(d),count=counts.get(w)||0,possible=each(w,w+4).filter(day=>eligible(day,c)).length;
-        return !map.has(d)&&count<cap&&count+1<possible;
-      });
-      if(!options.length)return;
-      const load=d=>counts.get(monday(d))||0;
-      const nearest=d=>Math.min(56,...[...map].filter(([,entry])=>entry.role==="extra").map(([other])=>Math.abs(d-other)));
-      options.sort((a,b)=>load(a)-load(b)||nearest(b)-nearest(a)||b-a);
-      map.set(options[0],{kind:"ordinary",why:"Jour complémentaire réparti pour atteindre le volume cible.",role:"extra"});
+  const extraWeeks=new Map();
+  for(const d of active){
+    const week=monday(d);
+    if(!extraWeeks.has(week)){
+      const capacity=each(week,week+4).filter(day=>eligible(day,c)).length;
+      extraWeeks.set(week,{dates:[],cap:Math.min(3,capacity-1)});
     }
+    extraWeeks.get(week).dates.push(d);
   }
-  fill(active.filter(d=>d>=mid),3);
-  fill(active,3);
+  const loads=new Map();
+  for(const d of map.keys()){
+    const week=monday(d);
+    loads.set(week,(loads.get(week)||0)+1);
+  }
+  while(map.size<target){
+    const busy=[...loads].filter(([,load])=>load>=2).map(([w])=>w);
+    const options=[];
+    for(const [week,slot] of extraWeeks){
+      const load=loads.get(week)||0;
+      const day=slot.dates.find(d=>!map.has(d));
+      if(day===undefined||load>=slot.cap)continue;
+      const gap=Math.min(Infinity,...busy.map(w=>Math.abs(week-w)));
+      options.push({week,day,load,gap});
+    }
+    options.sort((a,b)=>a.load-b.load||b.gap-a.gap||a.week-b.week);
+    const next=options[0];
+    if(!next)break;
+    map.set(next.day,{kind:"ordinary",why:"Jour complémentaire réparti sur la période éligible pour atteindre le volume cible.",role:"extra"});
+    loads.set(next.week,next.load+1);
+  }
   if(map.size>target)throw Error("Les journées imposées et le rythme récurrent dépassent le volume cible avec ces dates.");
   return {...dates,volume,mid,decisions,weeks,map,fixedSchedule};
 }
@@ -389,7 +406,7 @@ function renderDates(planDates){
     '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La date proposée est le <strong>'+full(planDates.autoEntry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Deuxièmes mardis compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
     '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
     '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
-    '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir le complément entre semaines à deux ou trois jours et semaines pleines supplémentaires selon les besoins.</li></ol><p>Contrat de <strong>'+days+' jours calendaires</strong>, dates de début et de fin incluses. Sur une base de 35 h par semaine, 25 % représentent <strong>'+formatHours.format(minimumHours)+' h</strong>. La maquette arrondit au jour complet supérieur, soit <strong>'+target+' jours × 7 h = '+target*hours+' h</strong>. Le compteur atteint 100 % quand ces journées sont placées.</p></details>'+
+    '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir les jours complémentaires sur toute la période éligible, en tenant compte de la charge de chaque semaine.</li></ol><p>Les semaines à deux ou trois jours peuvent commencer le <strong>'+full(firstExtraMonth(planDates.entry,planDates.c.duration))+'</strong> ('+(planDates.c.duration===12?'2ᵉ':'4ᵉ')+' mois de formation). Les journées imposées peuvent intervenir plus tôt.</p><p>Contrat de <strong>'+days+' jours calendaires</strong>, dates de début et de fin incluses. Sur une base de 35 h par semaine, 25 % représentent <strong>'+formatHours.format(minimumHours)+' h</strong>. La maquette arrondit au jour complet supérieur, soit <strong>'+target+' jours × 7 h = '+target*hours+' h</strong>. Le compteur atteint 100 % quand ces journées sont placées.</p></details>'+
     '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Pour éviter les ponts, le générateur cherche d’abord une autre semaine du même mois.</p></details>'+
     '<details><summary>Continuité de formation</summary><p>Les mois complets de la période de formation doivent contenir au moins une journée. Les périodes avant la rentrée et après la formation peuvent rester en entreprise dans les limites prévues.</p></details>';
 }
