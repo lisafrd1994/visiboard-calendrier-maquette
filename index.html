@@ -54,7 +54,6 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <label>Date du début de la formation<input id="entry-date" type="date" readonly><small id="limit-start"></small></label>
 <label>Date de fin de la formation<input id="end-date" type="date" readonly><small>Dernier jour ouvré du mois de soutenance</small></label>
 </div>
-<div class="date-extra"><button id="apply-end" class="ghost" type="button" disabled>Appliquer la fin de contrat</button></div>
 <div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la date recommandée.</label></div>
 <div id="date-message" class="feedback" role="status"></div>
 <details class="date-extra"><summary>Comprendre le calcul des dates</summary><div id="explain"></div></details>
@@ -370,7 +369,6 @@ function generateDates(){
     $("ack").hidden=true;
     $("ack-input").checked=false;
     $("regenerate").disabled=false;
-    $("apply-end").disabled=false;
     setMessage("date-message","Dates calculées. Vous pouvez générer le nouveau calendrier.");
     if(state)renderCalendar();
     else setMessage("calendar-message","Cliquez sur « Générer un nouveau calendrier » pour afficher les journées de formation.");
@@ -429,17 +427,6 @@ $("regenerate").onclick=()=>{
   }catch(e){
     setMessage("calendar-message",e.message+" Le dernier calendrier généré reste affiché.","bad");
   }
-};
-$("apply-end").onclick=()=>{
-  try{
-    const dates=readDatesWithChosenEnd();
-    $("ack-input").checked=false;
-    draft=dates;
-    renderDates(dates);
-    setMessage("date-message","Fin de contrat prise en compte. Générez le nouveau calendrier pour appliquer le volume recalculé.");
-    showEndChoice(dates);
-    if(state)renderCalendar();
-  }catch(e){setMessage("date-message",e.message,"bad");}
 };
 $("ack-input").onchange=()=>setMessage("date-message",$("ack-input").checked?"Écart à la date recommandée pris en compte.":"Confirmez la prise en compte de la date recommandée.","warn");
 $("publish").onclick=()=>{
