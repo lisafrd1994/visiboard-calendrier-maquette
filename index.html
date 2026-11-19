@@ -13,7 +13,7 @@ button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disa
 button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #16488d;outline-offset:2px}
 label{display:block;font-weight:700;font-size:13px}input:not([type=checkbox]),select{display:block;min-width:0;width:100%;margin-top:5px;height:32px;padding:5px 9px;color:#333;background:white;border:1px solid #bfbfbf;border-radius:4px;box-shadow:inset 0 1px 2px #0001}input[readonly]{background:#f6f6f6;color:#444}
 .action,.ghost{padding:6px 11px;border:1px solid #28659a;border-radius:3px;background:var(--blue);color:white;font-size:13px;line-height:1.25}.ghost{border-color:#bcbcbc;background:#f8f8f8;color:#333}.action:hover{background:#28659a}.ghost:hover{background:#eee}
-.dates,.calendar-pane{border:1px solid var(--outline);padding:13px 13px 15px}.fields,.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 27px}.fields{margin-bottom:10px}.soutenance-fields{grid-template-columns:minmax(130px,185px) minmax(160px,275px);width:min(100%,500px)}.facts{border-top:1px solid #e6e6e6;margin-top:16px;padding-top:15px}.facts small{display:block;color:#345b77;margin-top:4px}
+.dates,.calendar-pane{border:1px solid var(--outline);padding:13px 13px 15px}.fields,.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 27px}.fields{margin-bottom:10px}.soutenance-fields{grid-template-columns:minmax(130px,185px) minmax(160px,275px);width:min(100%,500px)}.facts{border-top:1px solid #e6e6e6;margin-top:16px;padding-top:15px}.facts small{display:block;color:#345b77;margin-top:4px}.facts small[hidden]{display:none}
 fieldset{padding:0;margin:0 0 14px;border:0}fieldset legend{font-weight:700;font-size:13px;padding:0;margin-bottom:3px}.rest-line{display:flex;gap:3px 10px;flex-wrap:wrap}.rest-line span{display:inline-flex;align-items:center;gap:4px;font-size:13px}.rest-line label{font-weight:400}.rest-line input{opacity:1;margin:0;accent-color:#337ab7}
 .actions,.section-head{display:flex;gap:7px 10px;flex-wrap:wrap;align-items:center}.section-head{justify-content:space-between}.check{display:flex;align-items:center;gap:5px;margin-top:7px}.date-extra{margin-top:10px}
 details{font-size:13px}summary{cursor:pointer;color:#245989}details details{margin:8px 0}details p{margin:5px 0 8px}details ol{margin:6px 0;padding-left:21px}
@@ -50,9 +50,9 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <button class="action">Générer les dates</button>
 </form>
 <div class="facts">
-<label>Date de fin de contrat<input id="end-choice" type="date"><small id="limit-end"></small></label>
+<label>Date de fin de contrat<input id="end-choice" type="date"><small id="contract-duration" hidden>Durée du contrat · <strong></strong></small><small id="limit-end"></small></label>
 <label>Date du début de la formation<input id="entry-date" type="date"><small id="limit-start"></small></label>
-<label>Date de fin de la formation<input id="end-date" type="date"><small id="limit-training-end">Dernier jour ouvré proposé par défaut</small></label>
+<label>Date de fin de la formation<input id="end-date" type="date"><small id="training-duration" hidden>Durée de la formation · <strong></strong></small><small id="limit-training-end">Dernier jour ouvré proposé par défaut</small></label>
 </div>
 <div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la date recommandée.</label></div>
 <div id="date-message" class="feedback" role="status"></div>
@@ -390,6 +390,25 @@ function renderChoice(){
     ? '<button id="move" class="ghost">Déplacer cette journée</button>'+(item.role==="manual"?'<button id="remove" class="ghost">Retirer l’ajout manuel</button>':"")
     : canAdd?'<button id="add" class="ghost">Ajouter un jour en semaine de rentrée</button>':"";
 }
+function durationInMonths(start,end){
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
+  const endExclusive=end+1;
+  const from=obj(start),to=obj(endExclusive);
+  const months=(to.getUTCFullYear()-from.getUTCFullYear())*12+to.getUTCMonth()-from.getUTCMonth();
+  const lastDay=obj(monthOffset(endExclusive,1)-1).getUTCDate();
+  const anniversary=Math.min(from.getUTCDate(),lastDay);
+  return months+Number(to.getUTCDate()>anniversary);
+}
+function renderDurations(){
+  for(const [label,start,end] of [
+    ["contract-duration","start","end-choice"],
+    ["training-duration","entry-date","end-date"]
+  ]){
+    const months=durationInMonths(parse($(start).value),parse($(end).value));
+    $(label).hidden=months===null;
+    $(label).querySelector("strong").textContent=months===null?"":months+" mois";
+  }
+}
 function renderDates(planDates){
   $("entry-date").min=iso(planDates.start);
   $("entry-date").max=iso(Math.min(planDates.limit,planDates.defense-1));
@@ -398,6 +417,7 @@ function renderDates(planDates){
   $("entry-date").value=iso(planDates.entry);
   $("end-date").value=iso(planDates.end);
   $("end-choice").value=iso(planDates.contractEnd);
+  renderDurations();
   $("limit-start").textContent="Date limite de rentrée · "+full(planDates.limit);
   $("limit-training-end").textContent="Dernier jour ouvré proposé par défaut · "+full(planDates.autoEnd);
   $("limit-end").textContent="Date recommandée · "+full(planDates.end+56);
@@ -486,6 +506,7 @@ function validMove(from,to){
 $("legend").innerHTML=legend();$("pdf-legend").innerHTML=legend();
 $("rest").addEventListener("change",()=>renderWeekdays());
 $("form").addEventListener("submit",e=>{e.preventDefault();generateDates();});
+for(const id of ["start","end-choice","entry-date","end-date"])$(id).addEventListener("input",renderDurations);
 function readSelectedDates(){
   const dates=readFormDates();
   const displayed=draft??state;
