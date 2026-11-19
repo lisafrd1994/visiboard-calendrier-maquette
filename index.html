@@ -431,7 +431,11 @@ function renderWeekdays(preferred=$("weekday").value){
   $("weekday").value=rest.includes(Number(preferred))?"":preferred;
 }
 function loadForm(){
-  $("start").value="2028-11-21";
+  const today=new Date();
+  const year=today.getFullYear();
+  const month=String(today.getMonth()+1).padStart(2,"0");
+  const day=String(today.getDate()).padStart(2,"0");
+  $("start").value=year+"-"+month+"-"+day;
   $("defense-year").innerHTML=Array.from({length:17},(_,n)=>2025+n).map(y=>'<option>'+y+'</option>').join("");
   $("defense-month").innerHTML=Array.from({length:12},(_,n)=>'<option value="'+(n+1)+'">'+fmt(date(2026,n+1,1),{month:"long"})+'</option>').join("");
   $("defense-year").value="2030";
