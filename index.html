@@ -51,8 +51,8 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 </form>
 <div class="facts">
 <label>Date de fin de contrat<input id="end-choice" type="date"><small id="limit-end"></small></label>
-<label>Date du début de la formation<input id="entry-date" type="date" readonly><small id="limit-start"></small></label>
-<label>Date de fin de la formation<input id="end-date" type="date" readonly><small>Dernier jour ouvré du mois de soutenance</small></label>
+<label>Date du début de la formation<input id="entry-date" type="date"><small id="limit-start"></small></label>
+<label>Date de fin de la formation<input id="end-date" type="date"><small id="limit-training-end">Dernier jour ouvré proposé par défaut</small></label>
 </div>
 <div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la date recommandée.</label></div>
 <div id="date-message" class="feedback" role="status"></div>
@@ -171,11 +171,11 @@ function calculateDates(c,start,defense,recur){
   const end=lastBusiness(defense,c);
   if(end===null)throw Error("Aucun jour ouvré éligible pendant le mois de soutenance.");
   const limit=start+84;
-  const possible=monthsBetween(start,limit).map(secondTuesday).filter(d=>d>=start&&d<=limit&&d<end&&eligible(d,c));
+  const possible=monthsBetween(start,limit).map(secondTuesday).filter(d=>d>=start&&d<=limit&&d<defense&&eligible(d,c));
   const entry=possible.at(-1);
   if(entry===undefined)throw Error("Aucune rentrée éligible avant le "+full(limit)+". Vérifiez le début de contrat et la session de soutenance.");
   if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le scénario.");
-  return {c,start,defense,recur,entry,end,limit,possible,contractEnd:end+56};
+  return {c,start,defense,recur,entry,end,limit,possible,autoEntry:entry,autoEnd:end,contractEnd:end+56};
 }
 function contractVolume(start,contractEnd){
   const days=contractEnd-start+1;
@@ -215,7 +215,7 @@ function plan(dates){
   const volume=contractVolume(start,contractEnd);
   const {target}=volume;
   const mid=entry+Math.ceil((end-entry)/2), lastMonth=monthOffset(defense,-1);
-  const map=new Map([[entry,{kind:"entry",why:"Deuxième mardi du mois de rentrée. Cette journée est verrouillée."}],[end,{kind:"end",why:"Dernier jour ouvré du mois de soutenance. C’est son unique journée de formation."}]]);
+  const map=new Map([[entry,{kind:"entry",why:(entry===dates.autoEntry?"Deuxième mardi du mois de rentrée.":"Date de rentrée sélectionnée dans le formulaire.")+" Cette journée est verrouillée dans le calendrier."}],[end,{kind:"end",why:(end===dates.autoEnd?"Dernier jour ouvré du mois de soutenance.":"Date de fin de formation sélectionnée dans le mois de soutenance.")+" C’est l’unique journée de formation de ce mois."}]]);
   const decisions=[], weeks=[];
   const fixedSchedule=getFixedSchedule(c,entry,defense);
   for(const d of fixedSchedule.dates){
@@ -310,7 +310,7 @@ function info(d){
   if(state.c.rest.includes(weekday(d)))return {kind:"rest",why:"Jour de repos déclaré par l’entreprise."};
   if(weekday(d)===0||weekday(d)===6)return {kind:"company",why:"Jour potentiellement travaillé en entreprise. La formation est planifiée du lundi au vendredi."};
   if(d<state.entry||d>state.end)return {kind:"company",why:"Jour en entreprise en dehors de la période de formation."};
-  if(d>=state.defense)return {kind:"company",why:"Mois de soutenance. Seul le dernier jour ouvré est prévu en formation."};
+  if(d>=state.defense)return {kind:"company",why:"Mois de soutenance. Seule la date de fin de formation retenue est prévue en formation."};
   return {kind:"company",why:"Jour en entreprise dans le calendrier prévisionnel."};
 }
 function grid(m,interactive){
@@ -370,16 +370,21 @@ function renderChoice(){
     : canAdd?'<button id="add" class="ghost">Ajouter un jour en semaine de rentrée</button>':"";
 }
 function renderDates(planDates){
+  $("entry-date").min=iso(planDates.start);
+  $("entry-date").max=iso(Math.min(planDates.limit,planDates.defense-1));
+  $("end-date").min=iso(planDates.defense);
+  $("end-date").max=iso(planDates.autoEnd);
   $("entry-date").value=iso(planDates.entry);
   $("end-date").value=iso(planDates.end);
   $("end-choice").value=iso(planDates.contractEnd);
   $("limit-start").textContent="Date limite de rentrée · "+full(planDates.limit);
+  $("limit-training-end").textContent="Dernier jour ouvré proposé par défaut · "+full(planDates.autoEnd);
   $("limit-end").textContent="Date recommandée · "+full(planDates.end+56);
   const {days,minimumHours,target}=contractVolume(planDates.start,planDates.contractEnd);
   $("explain").innerHTML=
-    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La dernière rentrée possible est le <strong>'+full(planDates.entry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrées compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
+    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La date proposée est le <strong>'+full(planDates.autoEntry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Deuxièmes mardis compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
     '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
-    '<details open><summary>Mois de soutenance et fin de contrat</summary><p>Le <strong>'+full(planDates.end)+'</strong> est le dernier jour ouvré du mois. C’est la seule journée de formation qui y est générée. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
+    '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
     '<details><summary>Répartition du volume</summary><ol><li>Placer les dates fixes et le bloc prioritaire.</li><li>Planifier le jour récurrent à partir de la semaine 2.</li><li>Répartir le complément entre semaines à deux ou trois jours et semaines pleines supplémentaires selon les besoins.</li></ol><p>Contrat de <strong>'+days+' jours calendaires</strong>, dates de début et de fin incluses. Sur une base de 35 h par semaine, 25 % représentent <strong>'+formatHours.format(minimumHours)+' h</strong>. La maquette arrondit au jour complet supérieur, soit <strong>'+target+' jours × 7 h = '+target*hours+' h</strong>. Le compteur atteint 100 % quand ces journées sont placées.</p></details>'+
     '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Pour éviter les ponts, le générateur cherche d’abord une autre semaine du même mois.</p></details>'+
     '<details><summary>Continuité de formation</summary><p>Les mois complets de la période de formation doivent contenir au moins une journée. Les périodes avant la rentrée et après la formation peuvent rester en entreprise dans les limites prévues.</p></details>';
@@ -456,16 +461,29 @@ function validMove(from,to){
 $("legend").innerHTML=legend();$("pdf-legend").innerHTML=legend();
 $("rest").addEventListener("change",()=>renderWeekdays());
 $("form").addEventListener("submit",e=>{e.preventDefault();generateDates();});
-function readDatesWithChosenEnd(){
+function readSelectedDates(){
   const dates=readFormDates();
   const displayed=draft??state;
-  const typedEnd=parse($("end-choice").value);
-  // An untouched end from a different session should follow its new default.
-  const chosenEnd=dates.defense!==displayed.defense&&typedEnd===displayed.contractEnd ? dates.contractEnd : typedEnd;
-  if(!Number.isFinite(chosenEnd)||chosenEnd<dates.end||chosenEnd>dates.contractEnd){
-    throw Error("Choisissez une fin de contrat entre le "+full(dates.end)+" et le "+full(dates.contractEnd)+".");
+  const typedEntry=parse($("entry-date").value);
+  const typedTrainingEnd=parse($("end-date").value);
+  const typedContractEnd=parse($("end-choice").value);
+  const newSession=dates.defense!==displayed.defense;
+  const entry=typedEntry===displayed.entry&&displayed.entry===displayed.autoEntry ? dates.autoEntry : typedEntry;
+  const end=typedTrainingEnd===displayed.end&&(newSession||displayed.end===displayed.autoEnd) ? dates.autoEnd : typedTrainingEnd;
+  if(!Number.isFinite(entry)||entry<dates.start||entry>dates.limit||entry>=dates.defense||!eligible(entry,dates.c)){
+    throw Error("Choisissez un début de formation sur un jour ouvré, entre le début du contrat et la date limite de rentrée, avant le mois de soutenance.");
   }
-  return {...dates,contractEnd:chosenEnd};
+  if(!Number.isFinite(end)||end<dates.defense||end>dates.autoEnd||!eligible(end,dates.c)){
+    throw Error("Choisissez une fin de formation sur un jour ouvré du mois de soutenance.");
+  }
+  if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le parcours.");
+  const contractLimit=end+56;
+  const followsDefault=typedContractEnd===displayed.contractEnd&&(newSession||displayed.contractEnd===displayed.end+56);
+  const contractEnd=followsDefault?contractLimit:typedContractEnd;
+  if(!Number.isFinite(contractEnd)||contractEnd<end||contractEnd>contractLimit){
+    throw Error("Choisissez une fin de contrat entre le "+full(end)+" et le "+full(contractLimit)+".");
+  }
+  return {...dates,entry,end,contractEnd};
 }
 function showEndChoice(dates){
   const limit=dates.end+56;
@@ -476,7 +494,7 @@ function showEndChoice(dates){
 }
 $("regenerate").onclick=()=>{
   try{
-    const dates=readDatesWithChosenEnd();
+    const dates=readSelectedDates();
     const calendar=plan(dates);
     if(dates.contractEnd!==(draft??state).contractEnd)$("ack-input").checked=false;
     renderDates(dates);
