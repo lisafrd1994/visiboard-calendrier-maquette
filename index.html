@@ -64,7 +64,7 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <details open><summary>Journée sélectionnée</summary><div id="choice" class="choice" aria-live="polite"></div><div id="edit" class="actions edit"></div></details>
 <details open><summary>Pourquoi ces semaines pleines ?</summary><div id="weeks"></div></details>
 <details><summary>Jours non modifiables</summary><p id="fixed-summary"></p><button id="publish" class="ghost" type="button" disabled>Simuler une nouvelle date fixe</button><div id="fixed-message" class="feedback" role="status"></div></details>
-<details><summary>Hypothèses de la maquette</summary><p>La maquette utilise une base de 35 h par semaine et des journées de formation de 7 h. Le parcours de deux ans place deux jours non modifiables de démonstration avant la soutenance. La répartition du complément et le jour ordinaire à remplacer restent à valider. Une occurrence récurrente fériée est sautée dans cet exemple.</p></details>
+<details><summary>Hypothèses de la maquette</summary><p>La maquette utilise une base de 35 h par semaine et des journées de formation de 7 h. Les jours non modifiables suivent les listes d’exemple par produit et mois de soutenance. Pour les autres sessions, la maquette affiche des dates simulées. La répartition du complément et le jour ordinaire à remplacer restent à valider. Une occurrence récurrente fériée est sautée dans cet exemple.</p></details>
 </aside>
 <section class="calendar-pane" aria-label="Calendrier de formation prévisionnel">
 <div class="section-head"><button type="button" id="regenerate" class="action" disabled>Générer un nouveau calendrier</button><button id="preview" type="button" disabled class="ghost">Aperçu du PDF</button></div>
@@ -77,6 +77,32 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 </main>
 <dialog id="document" class="modal"><div class="section-head"><h2>Calendrier prévisionnel de formation</h2><div class="no-print"><button id="print" class="action">Imprimer / PDF</button> <button id="close" class="ghost">Fermer</button></div></div><p id="pdf-summary"></p><div class="legend" id="pdf-legend"></div><div class="print-grid" id="pdf-grid"></div></dialog>
 <script>
+const visualCommon=[
+  "2025-09-26","2025-10-31","2025-11-28","2025-12-19",
+  "2026-01-26","2026-01-27","2026-01-28","2026-01-29","2026-01-30",
+  "2026-03-27","2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-06-26"
+];
+const visualWinter=[
+  "2026-01-30","2026-02-27","2026-03-27","2026-04-24",
+  "2026-05-18","2026-05-19","2026-05-20","2026-05-21","2026-05-22","2026-06-26",
+  "2026-09-21","2026-09-22","2026-09-23","2026-09-24","2026-09-25","2026-11-27"
+];
+const visualJanuary=["2027-01-25","2027-01-26","2027-01-27","2027-01-28","2027-01-29"];
+const visualMay=["2027-05-24","2027-05-25","2027-05-26","2027-05-27","2027-05-28"];
+const fixedBySession={
+  12:{
+    "2027-11":["2026-12-18","2027-01-21","2027-02-12","2027-03-19","2027-04-23","2027-05-25","2027-06-18","2027-09-28","2027-10-15"],
+    "2028-05":["2027-04-23","2027-05-25","2027-06-18","2027-09-28","2027-10-15","2027-11-30","2027-12-17","2028-01-25","2028-02-11","2028-03-28","2028-04-21"]
+  },
+  24:{
+    "2026-10":[...visualCommon,"2026-09-11"],
+    "2027-02":[...visualWinter,"2027-01-15"],
+    "2027-06":["2026-05-22","2026-06-26","2026-07-24","2026-09-11",...visualWinter.slice(10),...visualJanuary,"2027-03-26","2027-05-14"],
+    "2027-10":[...visualCommon,...visualWinter.slice(10),...visualJanuary,"2027-03-26",...visualMay,"2027-06-25","2027-09-10"],
+    "2028-02":[...visualWinter,...visualJanuary,"2027-03-26",...visualMay,"2027-06-25",
+      "2027-09-20","2027-09-21","2027-09-22","2027-09-23","2027-09-24","2027-11-26","2028-01-14"]
+  }
+};
 const workweekHours=35;
 const minimumShare=.25;
 const formatHours=new Intl.NumberFormat("fr-FR",{maximumFractionDigits:2});
@@ -157,6 +183,33 @@ function contractVolume(start,contractEnd){
   const target=Math.ceil(minimumHours/hours);
   return {days,minimumHours,target};
 }
+function simulatedFixedDays(entry,defense,duration){
+  const firstMonth=monthStart(entry);
+  const dates=new Set();
+  if(duration===24){
+    for(const offset of [3,7,11,15,19]){
+      const m=monthOffset(firstMonth,offset);
+      if(m>=defense)break;
+      const w=lastFullWeek(m);
+      for(const d of each(w,w+4))dates.add(d);
+    }
+  }
+  const cadence=duration===24?2:1;
+  const cap=duration===24?11:10;
+  for(let i=0;i<cap;i++){
+    const m=monthOffset(firstMonth,1+i*cadence);
+    if(m>=defense)break;
+    const friday=m+((5-weekday(m)+7)%7)+14;
+    if(!dates.has(friday))dates.add(friday);
+  }
+  return [...dates].sort((a,b)=>a-b);
+}
+function getFixedSchedule(c,entry,defense){
+  const configured=fixedBySession[c.duration][monthKey(defense)];
+  const listed=configured?configured.map(parse):simulatedFixedDays(entry,defense,c.duration);
+  const dates=listed.filter(d=>d>=entry&&d<defense&&eligible(d,c));
+  return {dates,configured:Boolean(configured)};
+}
 function plan(dates){
   const {c,start,defense,recur,entry,end,contractEnd}=dates;
   const volume=contractVolume(start,contractEnd);
@@ -164,13 +217,16 @@ function plan(dates){
   const mid=entry+Math.ceil((end-entry)/2), lastMonth=monthOffset(defense,-1);
   const map=new Map([[entry,{kind:"entry",why:"Deuxième mardi du mois de rentrée. Cette journée est verrouillée."}],[end,{kind:"end",why:"Dernier jour ouvré du mois de soutenance. C’est son unique journée de formation."}]]);
   const decisions=[], weeks=[];
-  if(c.duration===24){
-    const preferred=secondTuesday(lastMonth);
-    const firstRecurring=monday(entry)+7;
-    const candidates=each(Math.max(preferred,firstRecurring),defense-1);
-    const earlier=each(firstRecurring,Math.min(preferred-1,defense-1)).reverse();
-    const fixedDays=candidates.concat(earlier).filter(d=>eligible(d,c)).slice(0,2);
-    for(const d of fixedDays)map.set(d,{kind:"fixed",why:"Date non modifiable de démonstration, intégrée au volume cible."});
+  const fixedSchedule=getFixedSchedule(c,entry,defense);
+  for(const d of fixedSchedule.dates){
+    const why=fixedSchedule.configured
+      ?"Jour imposé dans la liste du produit pour cette session de soutenance, inclus dans le volume de formation."
+      :"Jour non modifiable simulé pour cette session, inclus dans le volume de formation.";
+    if(d===entry){
+      map.get(d).why+=" "+why;
+    }else{
+      map.set(d,{kind:"fixed",why});
+    }
   }
   function tryBlock(m,required){
     const first=lastFullWeek(m);
@@ -236,7 +292,7 @@ function plan(dates){
   fill(active.filter(d=>d>=mid),3);
   fill(active,3);
   if(map.size>target)throw Error("Les journées imposées et le rythme récurrent dépassent le volume cible avec ces dates.");
-  return {...dates,volume,mid,decisions,weeks,map};
+  return {...dates,volume,mid,decisions,weeks,map,fixedSchedule};
 }
 function setMessage(id,value,kind=""){
   $(id).textContent=value;
@@ -332,7 +388,11 @@ function render(){
   $("weeks").innerHTML=state.decisions.map(d=>'<div class="decision '+(d.skip?"skipped":"")+'">'+
     (d.day===undefined?d.text:'<button type="button" data-jump="'+d.day+'">'+d.text+'</button>')+'</div>').join("")+
     '<p class="muted">Les blocs supplémentaires remontent par pas de deux mois, dans la seconde moitié du parcours.</p>';
-  $("fixed-summary").textContent=[...state.map.values()].filter(x=>x.kind==="fixed").length+" date(s) fixe(s) déjà comprises dans le volume.";
+  const count=[...state.map.values()].filter(x=>x.kind==="fixed").length+Number(state.fixedSchedule.dates.includes(state.entry));
+  const source=state.fixedSchedule.configured
+    ? "Liste du produit pour la soutenance de "+monthLabel(state.defense)+"."
+    : "Dates simulées pour la soutenance de "+monthLabel(state.defense)+".";
+  $("fixed-summary").textContent=count+" jour(s) non modifiable(s) inclus dans le volume. "+source;
   renderCalendar();
 }
 function selectedRest(){
@@ -379,7 +439,7 @@ function activateCalendar(calendar){
   draft=null;
   selected=null;
   moveSource=null;
-  $("publish").disabled=state.c.duration===12;
+  $("publish").disabled=false;
   $("preview").disabled=false;
   setMessage("fixed-message","");
   render();
