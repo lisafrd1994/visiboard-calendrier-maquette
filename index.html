@@ -50,10 +50,10 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 </form>
 <div class="facts">
 <label>Date de fin de contrat<input id="end-choice" type="date"><small id="contract-duration" hidden>Durée du contrat · <strong></strong></small><small id="limit-end"></small></label>
-<label>Date du début de la formation<input id="entry-date" type="date"><small id="limit-start"></small></label>
+<label>Rentrées possibles<select id="entry-date" disabled><option value="">Générez les dates</option></select></label>
 <label>Date de fin de la formation<input id="end-date" type="date" readonly><small id="training-duration" hidden>Durée de la formation · <strong></strong></small><small id="limit-training-end">Dernier jour ouvré du mois de soutenance</small></label>
 </div>
-<div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la date recommandée.</label></div>
+<div id="ack" hidden><label class="check"><input id="ack-input" type="checkbox"> J’ai pris en compte la dernière date possible.</label></div>
 <div id="date-message" class="feedback" role="status"></div>
 <details class="date-extra"><summary>Comprendre le calcul des dates</summary><div id="explain"></div></details>
 </section>
@@ -342,18 +342,17 @@ function renderDurations(){
   }
 }
 function renderDates(planDates){
-  $("entry-date").min=iso(planDates.start);
-  $("entry-date").max=iso(planDates.autoEntry);
+  $("entry-date").innerHTML=planDates.possible.map(d=>'<option value="'+iso(d)+'">'+fmt(d,{weekday:"long",day:"numeric",month:"long",year:"numeric"})+'</option>').join("");
+  $("entry-date").disabled=false;
   $("end-date").min=iso(planDates.defense);
   $("entry-date").value=iso(planDates.entry);
   $("end-date").value=iso(planDates.end);
   $("end-choice").value=iso(planDates.contractEnd);
   renderDurations();
-  $("limit-start").textContent="Date limite de rentrée · "+full(planDates.limit);
   $("limit-training-end").textContent="Dernier jour ouvré du mois de soutenance";
-  $("limit-end").textContent="Date recommandée · "+full(planDates.end+56);
+  $("limit-end").textContent="Dernière date possible · "+full(planDates.end+56);
   $("explain").innerHTML=
-    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La date proposée est le <strong>'+full(planDates.autoEntry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Deuxièmes mardis compatibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
+    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La date proposée est le <strong>'+full(planDates.autoEntry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Rentrées possibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
     '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
     '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. Les 28 jours qui la précèdent sont protégés. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
     '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Une occurrence récurrente non éligible est sautée.</p></details>';
@@ -475,7 +474,7 @@ function showEndChoice(dates){
   const limit=dates.end+56;
   $("ack").hidden=!(dates.contractEnd<limit);
   if(!$("ack").hidden){
-    setMessage("date-message","Fin de contrat retenue le "+full(dates.contractEnd)+". Date recommandée · "+full(limit)+".","warn");
+    setMessage("date-message","Fin de contrat retenue le "+full(dates.contractEnd)+". Dernière date possible · "+full(limit)+".","warn");
   }
 }
 $("regenerate").onclick=()=>{
@@ -492,7 +491,7 @@ $("regenerate").onclick=()=>{
     setMessage("calendar-message",e.message+" Le dernier calendrier généré reste affiché.","bad");
   }
 };
-$("ack-input").onchange=()=>setMessage("date-message",$("ack-input").checked?"Écart à la date recommandée pris en compte.":"Confirmez la prise en compte de la date recommandée.","warn");
+$("ack-input").onchange=()=>setMessage("date-message",$("ack-input").checked?"Écart à la dernière date possible pris en compte.":"Confirmez la prise en compte de la dernière date possible.","warn");
 $("publish").onclick=()=>{
   const ordinary=[...state.map].reverse().find(([,x])=>x.kind==="ordinary");
   if(!ordinary){setMessage("fixed-message","Aucune journée ordinaire disponible pour la simulation.","warn");return;}
