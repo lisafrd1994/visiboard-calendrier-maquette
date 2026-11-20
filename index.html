@@ -390,10 +390,11 @@ function loadForm(){
   const month=String(today.getMonth()+1).padStart(2,"0");
   const day=String(today.getDate()).padStart(2,"0");
   $("start").value=year+"-"+month+"-"+day;
-  $("defense-year").innerHTML=Array.from({length:17},(_,n)=>2025+n).map(y=>'<option>'+y+'</option>').join("");
-  $("defense-month").innerHTML=Array.from({length:12},(_,n)=>'<option value="'+(n+1)+'">'+fmt(date(2026,n+1,1),{month:"long"})+'</option>').join("");
-  $("defense-year").value="2030";
-  $("defense-month").value="1";
+  const emptyOption='<option value="" selected disabled></option>';
+  $("defense-year").innerHTML=emptyOption+Array.from({length:17},(_,n)=>2025+n).map(y=>'<option>'+y+'</option>').join("");
+  $("defense-month").innerHTML=emptyOption+Array.from({length:12},(_,n)=>'<option value="'+(n+1)+'">'+fmt(date(2026,n+1,1),{month:"long"})+'</option>').join("");
+  $("defense-year").value="";
+  $("defense-month").value="";
   $("rest").innerHTML=[1,2,3,4,5,6,0].map(n=>'<span><input id="rest-'+n+'" type="checkbox" value="'+n+'" '+([0,6].includes(n)?'checked':'')+'><label for="rest-'+n+'">'+dayNames[n]+'</label></span>').join("");
   renderWeekdays("3");
 }
