@@ -115,6 +115,8 @@ const kinds={
 const dayNames=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
 const daysShort=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 const DAY=86400000, hours=7;
+const referenceHoursPerMonth=35;
+const percentLabel=new Intl.NumberFormat("fr-FR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
 const date=(y,m,d)=>Date.UTC(y,m-1,d)/DAY;
 const parse=value=>value ? Date.parse(value)/DAY : NaN;
 const iso=d=>new Date(d*DAY).toISOString().slice(0,10);
@@ -285,7 +287,10 @@ function calendarMonths(interactive){
   ).join("");
 }
 function renderCalendar(){
-  $("stats").innerHTML='<tbody><tr><th scope="row">Heures planifiées</th><td><strong>'+state.map.size*hours+' h</strong></td></tr></tbody>';
+  const plannedHours=state.map.size*hours;
+  const referenceHours=durationInMonths(state.start,state.contractEnd)*referenceHoursPerMonth;
+  $("stats").innerHTML='<tbody><tr><th scope="row">Heures planifiées</th><td><strong>'+plannedHours+' h</strong> / '+referenceHours+' h</td></tr>'+
+    '<tr><th scope="row">Pourcentage</th><td><strong>'+percentLabel.format(plannedHours/referenceHours)+'</strong> <small>(sur '+referenceHoursPerMonth+' h/mois)</small></td></tr></tbody>';
   setMessage("calendar-message",draft?"Dates recalculées. Générez le nouveau calendrier pour appliquer ces dates.":"", "warn");
   $("shortcuts").innerHTML=[
     ["Aller à la rentrée",state.entry],["Aller à la semaine réservée",state.reservedWeek],["Aller à la soutenance",state.end]
@@ -312,7 +317,7 @@ function renderChoice(){
     $("edit").innerHTML=moveSource!==null?'<span class="muted">Journée à déplacer · '+full(moveSource)+'</span><button id="cancel-move" class="ghost">Annuler</button>':"";
     return;
   }
-  const item=info(selected),canAdd=canAddInEntryWeek(selected);
+  const item=info(selected),canAdd=canAddTrainingDay(selected);
   $("choice").innerHTML="<p><strong>"+full(selected)+" · "+kinds[item.kind][0]+"</strong></p><p class='muted'>"+item.why+"</p>";
   if(moveSource!==null){
     $("edit").innerHTML='<span class="muted">Déplacer le '+full(moveSource)+'</span><button id="finish-move" class="action">Déplacer ici</button><button id="cancel-move" class="ghost">Annuler</button>';
@@ -320,7 +325,7 @@ function renderChoice(){
   }
   $("edit").innerHTML=item.kind==="ordinary"
     ? '<button id="move" class="ghost">Déplacer cette journée</button>'+(item.role==="manual"?'<button id="remove" class="ghost">Retirer l’ajout manuel</button>':"")
-    : canAdd?'<button id="add" class="ghost">Ajouter un jour en semaine de rentrée</button>':"";
+    : canAdd?'<button id="add" class="ghost">Ajouter un jour de formation</button>':"";
 }
 function durationInMonths(start,end){
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
@@ -433,8 +438,9 @@ function hasOtherEntryWeekDay(exclude=null){
   const week=monday(state.entry);
   return [...state.map.keys()].some(d=>d!==state.entry&&d!==exclude&&monday(d)===week);
 }
-function canAddInEntryWeek(d){
-  return monday(d)===monday(state.entry)&&d>state.entry&&d<state.protectedFrom&&eligible(d,state.c)&&!state.map.has(d)&&!hasOtherEntryWeekDay();
+function canAddTrainingDay(d){
+  return d>state.entry&&d<state.protectedFrom&&eligible(d,state.c)&&!state.map.has(d)&&
+    (monday(d)!==monday(state.entry)||!hasOtherEntryWeekDay());
 }
 function validMove(from,to){
   if(state.map.get(from)?.kind!=="ordinary")return "Cette journée est verrouillée.";
@@ -511,10 +517,10 @@ document.addEventListener("click",event=>{
   if(button.dataset.jump!==undefined)selectDay(Number(button.dataset.jump),{jump:true});
   if(button.id==="move"){moveSource=selected;renderChoice();}
   if(button.id==="cancel-move"){moveSource=null;renderCalendar();}
-  if(button.id==="add"&&canAddInEntryWeek(selected)){
-    state.map.set(selected,{kind:"ordinary",why:"Ajout manuel du RE en semaine de rentrée.",role:"manual"});renderCalendar();
+  if(button.id==="add"&&canAddTrainingDay(selected)){
+    state.map.set(selected,{kind:"ordinary",why:"Jour de formation ajouté manuellement par le RE.",role:"manual"});renderCalendar();
   }
-  if(button.id==="remove"){state.map.delete(selected);renderCalendar();}
+  if(button.id==="remove"&&state.map.get(selected)?.role==="manual"){state.map.delete(selected);renderCalendar();}
   if(button.id==="finish-move"){
     const problem=validMove(moveSource,selected);
     if(problem){setMessage("calendar-message",problem,"bad");return;}
