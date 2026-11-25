@@ -348,7 +348,7 @@ function renderChoice(){
     ? '<button id="move" class="ghost">Déplacer cette journée</button>'
     : "";
   if(item.kind==="ordinary"&&wouldLeaveEmptyMonth(selected)){
-    $("choice").innerHTML+="<p>Dernier jour de formation de "+monthLabel(selected)+". Vous pouvez le déplacer dans le même mois ou ajouter d’abord un autre jour de formation dans ce mois.</p>";
+    $("choice").innerHTML+="<p>Dernier jour de formation du mois. Vous pouvez le déplacer dans le même mois ou ajouter d’abord un autre jour de formation dans ce mois.</p>";
   }
 }
 function durationInMonths(start,end){
