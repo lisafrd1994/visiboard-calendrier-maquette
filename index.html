@@ -329,7 +329,7 @@ function selectDay(d,{jump=false}={}){
 }
 function renderChoice(){
   if(selected===null||selected<state.start||selected>state.contractEnd){
-    $("choice").innerHTML="<p>Cliquez sur un jour d’entreprise éligible pour l’ajouter à la formation. Recliquez sur un ajout manuel pour le retirer.</p>";
+    $("choice").innerHTML="<p>Cliquez sur un jour d’entreprise éligible pour l’ajouter à la formation. Cliquez sur un jour de formation modifiable pour le retirer.</p>";
     $("edit").innerHTML=moveSource!==null?'<span class="muted">Journée à déplacer · '+full(moveSource)+'</span><button id="cancel-move" class="ghost">Annuler</button>':"";
     return;
   }
@@ -471,13 +471,17 @@ function canAddTrainingDay(d){
   return d>state.entry&&d<state.protectedFrom&&eligible(d,state.c)&&!state.map.has(d)&&
     (monday(d)!==monday(state.entry)||!hasOtherEntryWeekDay());
 }
+function wouldLeaveEmptyMonth(from,to){
+  const month=monthStart(from);
+  return month>=state.entry&&monthOffset(month,1)-1<=state.end&&
+    (to===undefined||monthStart(to)!==month)&&
+    ![...state.map.keys()].some(d=>d!==from&&monthStart(d)===month);
+}
 function validMove(from,to){
   if(state.map.get(from)?.kind!=="ordinary")return "Cette journée est verrouillée.";
   if(to<state.entry||to>=state.protectedFrom||state.map.has(to)||!eligible(to,state.c))return "Choisissez un jour ouvré éligible et libre en dehors de la période protégée et du mois de soutenance.";
   if(monday(to)===monday(state.entry)&&hasOtherEntryWeekDay(from))return "Un autre jour de formation a déjà été ajouté en semaine de rentrée.";
-  const fromMonth=monthStart(from);
-  if(fromMonth>=state.entry&&monthOffset(fromMonth,1)-1<=state.end&&monthStart(to)!==fromMonth&&
-     ![...state.map.keys()].some(d=>d!==from&&monthStart(d)===fromMonth)){
+  if(wouldLeaveEmptyMonth(from,to)){
     return "Ce déplacement laisserait un mois civil complet sans formation.";
   }
   return "";
@@ -545,8 +549,13 @@ document.addEventListener("click",event=>{
   if(button.dataset.day!==undefined){
     const day=Number(button.dataset.day);
     const item=state.map.get(day);
-    if(moveSource===null&&(item?.role==="manual"||canAddTrainingDay(day))){
-      if(item?.role==="manual"){
+    if(moveSource===null&&(item?.kind==="ordinary"||canAddTrainingDay(day))){
+      if(item?.kind==="ordinary"&&wouldLeaveEmptyMonth(day)){
+        selectDay(day);
+        setMessage("calendar-message","Ce retrait laisserait un mois civil complet sans formation. Déplacez cette journée ou ajoutez d’abord une autre journée de formation dans le même mois.","warn");
+        return;
+      }
+      if(item?.kind==="ordinary"){
         state.map.delete(day);
       }else{
         state.map.set(day,{kind:"ordinary",why:"Jour de formation ajouté manuellement par le RE. Cliquez sur la case pour le retirer.",role:"manual"});
