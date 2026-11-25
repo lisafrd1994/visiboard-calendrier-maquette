@@ -347,6 +347,9 @@ function renderChoice(){
   $("edit").innerHTML=item.kind==="ordinary"
     ? '<button id="move" class="ghost">Déplacer cette journée</button>'
     : "";
+  if(item.kind==="ordinary"&&wouldLeaveEmptyMonth(selected)){
+    $("choice").innerHTML+="<p>Dernier jour de formation de "+monthLabel(selected)+". Vous pouvez le déplacer dans le même mois ou ajouter d’abord un autre jour de formation dans ce mois.</p>";
+  }
 }
 function durationInMonths(start,end){
   if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return null;
@@ -478,7 +481,7 @@ function isOpenTrainingDay(d){
 }
 function wouldLeaveEmptyMonth(from,to){
   const month=monthStart(from);
-  return month>=state.entry&&monthOffset(month,1)-1<=state.end&&
+  return month>=monthStart(state.entry)&&month<=monthStart(state.end)&&
     (to===undefined||monthStart(to)!==month)&&
     ![...state.map.keys()].some(d=>d!==from&&monthStart(d)===month);
 }
@@ -487,7 +490,7 @@ function validMove(from,to){
   if(to<state.entry||to>=state.protectedFrom||state.map.has(to)||!eligible(to,state.c))return "Choisissez un jour ouvré éligible et libre en dehors de la période protégée et du mois de soutenance.";
   if(monday(to)===monday(state.entry)&&hasOtherEntryWeekDay(from))return "Un autre jour de formation a déjà été ajouté en semaine de rentrée.";
   if(wouldLeaveEmptyMonth(from,to)){
-    return "Ce déplacement laisserait un mois civil complet sans formation.";
+    return "Conservez au moins un jour de formation en "+monthLabel(from)+". Choisissez une date dans le même mois.";
   }
   return "";
 }
@@ -563,7 +566,7 @@ document.addEventListener("click",event=>{
       }
       if(item?.kind==="ordinary"&&wouldLeaveEmptyMonth(day)){
         selectDay(day);
-        setMessage("calendar-message","Ce retrait laisserait un mois civil complet sans formation. Déplacez cette journée ou ajoutez d’abord une autre journée de formation dans le même mois.","warn");
+        setMessage("calendar-message","Conservez au moins un jour de formation en "+monthLabel(day)+". Déplacez cette journée dans le même mois ou ajoutez d’abord une autre journée de formation.","warn");
         return;
       }
       if(item?.kind==="ordinary"){
