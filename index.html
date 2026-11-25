@@ -13,7 +13,7 @@ button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:disa
 button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #16488d;outline-offset:2px}
 label{display:block;font-weight:700;font-size:13px}input:not([type=checkbox]),select{display:block;min-width:0;width:100%;margin-top:5px;height:32px;padding:5px 9px;color:#333;background:white;border:1px solid #bfbfbf;border-radius:4px;box-shadow:inset 0 1px 2px #0001}input[readonly]{background:#f6f6f6;color:#444}
 .action,.ghost{padding:6px 11px;border:1px solid #28659a;border-radius:3px;background:var(--blue);color:white;font-size:13px;line-height:1.25}.ghost{border-color:#bcbcbc;background:#f8f8f8;color:#333}.action:hover{background:#28659a}.ghost:hover{background:#eee}
-.dates,.calendar-pane{border:1px solid var(--outline);padding:13px 13px 15px}.fields,.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 27px}.fields{margin-bottom:10px}.soutenance-fields{grid-template-columns:minmax(130px,185px) minmax(160px,275px);width:min(100%,500px)}.facts{border-top:1px solid #e6e6e6;margin-top:16px;padding-top:15px}.facts small{display:block;color:#345b77;margin-top:4px}.facts small[hidden]{display:none}
+.dates,.calendar-pane{border:1px solid var(--outline);padding:13px 13px 15px}.fields,.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 27px}.fields{margin-bottom:10px}.contract-fields{grid-template-columns:repeat(4,minmax(0,1fr))}.soutenance-fields{grid-template-columns:minmax(130px,185px) minmax(160px,275px);width:min(100%,500px)}.facts{border-top:1px solid #e6e6e6;margin-top:16px;padding-top:15px}.facts small{display:block;color:#345b77;margin-top:4px}.facts small[hidden]{display:none}
 fieldset{padding:0;margin:0 0 14px;border:0}fieldset legend{font-weight:700;font-size:13px;padding:0;margin-bottom:3px}.rest-line{display:flex;gap:3px 10px;flex-wrap:wrap}.rest-line span{display:inline-flex;align-items:center;gap:4px;font-size:13px}.rest-line label{font-weight:400}.rest-line input{opacity:1;margin:0;accent-color:#337ab7}
 .actions,.section-head{display:flex;gap:7px 10px;flex-wrap:wrap;align-items:center}.section-head{justify-content:space-between}.check{display:flex;align-items:center;gap:5px;margin-top:7px}.date-extra{margin-top:10px}
 details{font-size:13px}summary{cursor:pointer;color:#245989}details details{margin:8px 0}details p{margin:5px 0 8px}details ol{margin:6px 0;padding-left:21px}
@@ -34,7 +34,8 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <section class="dates" aria-labelledby="dates-title">
 <h1 id="dates-title">Dates</h1>
 <form id="form">
-<div class="fields">
+<div class="fields contract-fields">
+<label>Niveau de formation<select id="level"><option value="bac2">Bac+2</option><option value="bachelor" selected>Bachelor</option><option value="bac5">Bac+5</option></select></label>
 <label>Type de parcours<select id="duration"><option value="12">1 an</option><option value="24">2 ans</option></select></label>
 <label>Date du début de contrat<input id="start" type="date" required></label>
 <label>Jour récurrent de formation à distance<select id="weekday" required></select></label>
@@ -124,6 +125,10 @@ const obj=d=>new Date(d*DAY);
 const weekday=d=>obj(d).getUTCDay();
 const monthStart=d=>date(obj(d).getUTCFullYear(),obj(d).getUTCMonth()+1,1);
 const monthOffset=(d,n)=>date(obj(d).getUTCFullYear(),obj(d).getUTCMonth()+1+n,1);
+function addCalendarMonths(d,n){
+  const target=monthOffset(d,n);
+  return Math.min(target+obj(d).getUTCDate()-1,monthOffset(target,1)-1);
+}
 const monthKey=d=>iso(d).slice(0,7);
 const monday=d=>d-(weekday(d)+6)%7;
 const fmt=(d,options)=>new Intl.DateTimeFormat("fr-FR",{timeZone:"UTC",...options}).format(obj(d));
@@ -166,13 +171,15 @@ function calculateDates(c,start,defense,recur){
   if(recur<1||recur>5||c.rest.includes(recur))throw Error("Choisissez un jour récurrent du lundi au vendredi, hors jours de repos.");
   const end=lastBusiness(defense);
   if(end===null)throw Error("Aucun jour ouvré éligible pendant le mois de soutenance.");
-  const limit=start+84;
+  const limit=addCalendarMonths(start,3)-1;
   const protectedFrom=Math.min(defense,end-28);
   const possible=monthsBetween(start,limit).map(secondTuesday).filter(d=>d>=start&&d<=limit&&d<protectedFrom&&eligible(d,c));
-  const entry=possible.at(-1);
-  if(entry===undefined)throw Error("Aucune rentrée éligible avant le "+full(limit)+". Vérifiez le début de contrat et la session de soutenance.");
+  const entry=possible[0];
+  if(entry===undefined)throw Error("Aucune rentrée éligible jusqu’au "+full(limit)+". Vérifiez le début de contrat et la session de soutenance.");
   if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le scénario.");
-  return {c,start,defense,recur,entry,end,limit,possible,autoEntry:entry,contractEnd:end+56,protectedFrom};
+  const contractLimit=addCalendarMonths(end,2)-1;
+  const defaultContractEnd=c.level==="bac5"?addCalendarMonths(end,1):contractLimit;
+  return {c,start,defense,recur,entry,end,limit,possible,autoEntry:entry,contractEnd:defaultContractEnd,defaultContractEnd,contractLimit,protectedFrom};
 }
 function simulatedFixedDays(entry,defense,duration){
   const firstMonth=monthStart(entry);
@@ -188,7 +195,8 @@ function simulatedFixedDays(entry,defense,duration){
   return [...dates].sort((a,b)=>a-b);
 }
 function getFixedSchedule(c,entry,defense){
-  const configured=fixedBySession[c.duration][monthKey(defense)];
+  const product=c.level==="bac2"?fixedBySession[24]:c.level==="bachelor"?fixedBySession[12]:null;
+  const configured=product?.[monthKey(defense)];
   const listed=configured?configured.map(parse):simulatedFixedDays(entry,defense,c.duration);
   const dates=listed.filter(d=>d>=entry&&d<defense&&eligible(d,c));
   return {dates,configured:Boolean(configured)};
@@ -352,14 +360,19 @@ function renderDates(planDates){
   $("end-date").min=iso(planDates.defense);
   $("entry-date").value=iso(planDates.entry);
   $("end-date").value=iso(planDates.end);
+  $("end-choice").min=iso(planDates.end);
+  $("end-choice").max=iso(planDates.contractLimit);
   $("end-choice").value=iso(planDates.contractEnd);
   renderDurations();
   $("limit-training-end").textContent="Dernier jour ouvré du mois de soutenance";
-  $("limit-end").textContent="Dernière date possible · "+full(planDates.end+56);
+  $("limit-end").textContent="Dernière date possible · "+full(planDates.contractLimit);
+  const endRule=planDates.c.level==="bac5"
+    ?"Pour le Bac+5, la date proposée ajoute un mois calendaire."
+    :"Pour le Bac+2 et le Bachelor, la date proposée est la dernière date possible afin de laisser une marge pour une poursuite d’études.";
   $("explain").innerHTML=
-    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. En ajoutant 84 jours, on obtient le <strong>'+full(planDates.limit)+'</strong>. La date proposée est le <strong>'+full(planDates.autoEntry)+'</strong>, deuxième mardi du mois retenu.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Rentrées possibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
+    '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. La fenêtre se termine le <strong>'+full(planDates.limit)+'</strong> (3 mois calendaires après le début du contrat, moins 1 jour). La première rentrée compatible est le <strong>'+full(planDates.autoEntry)+'</strong>.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Rentrées possibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
     '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
-    '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. Les 28 jours qui la précèdent sont protégés. La fin de contrat proposée ajoute 56 jours, jusqu’au <strong>'+full(planDates.end+56)+'</strong>.</p></details>'+
+    '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. Les 28 jours qui la précèdent sont protégés. '+endRule+' Date proposée · <strong>'+full(planDates.defaultContractEnd)+'</strong>. Dernière date possible · <strong>'+full(planDates.contractLimit)+'</strong> (2 mois calendaires après la fin de formation, moins 1 jour).</p></details>'+
     '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Une occurrence récurrente non éligible est sautée.</p></details>';
 }
 function render(){
@@ -409,7 +422,9 @@ function readFormDates(){
   const year=Number($("defense-year").value),month=Number($("defense-month").value);
   if(!year||!month)throw Error("Renseignez l’année et le mois de soutenance.");
   const duration=Number($("duration").value);
-  const c={duration,rest:selectedRest(),name:duration===24?"Formation de deux ans":"Formation d’un an"};
+  const level=$("level").value;
+  const levelLabel=$("level").selectedOptions[0].textContent;
+  const c={duration,level,rest:selectedRest(),name:levelLabel+" · "+(duration===24?"Formation de deux ans":"Formation d’un an")};
   return calculateDates(c,start,date(year,month,1),Number($("weekday").value));
 }
 function generateDates(){
@@ -469,17 +484,17 @@ function readSelectedDates(){
     throw Error("Choisissez un deuxième mardi compatible pour la rentrée · "+dates.possible.map(full).join(", ")+".");
   }
   if(end-entry>1100)throw Error("Choisissez une session de soutenance compatible avec le parcours.");
-  const contractLimit=end+56;
-  const followsDefault=typedContractEnd===displayed.contractEnd&&(newSession||displayed.contractEnd===displayed.end+56);
-  const contractEnd=followsDefault?contractLimit:typedContractEnd;
+  const {contractLimit,defaultContractEnd}=dates;
+  const followsDefault=typedContractEnd===displayed.contractEnd&&(newSession||displayed.contractEnd===displayed.defaultContractEnd);
+  const contractEnd=followsDefault?defaultContractEnd:typedContractEnd;
   if(!Number.isFinite(contractEnd)||contractEnd<end||contractEnd>contractLimit){
     throw Error("Choisissez une fin de contrat entre le "+full(end)+" et le "+full(contractLimit)+".");
   }
   return {...dates,entry,end,contractEnd};
 }
 function showEndChoice(dates){
-  const limit=dates.end+56;
-  $("ack").hidden=!(dates.contractEnd<limit);
+  const limit=dates.contractLimit;
+  $("ack").hidden=dates.c.level==="bac5"||dates.contractEnd===limit;
   if(!$("ack").hidden){
     setMessage("date-message","Fin de contrat retenue le "+full(dates.contractEnd)+". Dernière date possible · "+full(limit)+".","warn");
   }
