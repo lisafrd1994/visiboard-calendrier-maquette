@@ -38,7 +38,7 @@ details{font-size:13px}summary{cursor:pointer;color:#245989}details details{marg
 <label>Niveau de formation<select id="level"><option value="bac2">Bac+2</option><option value="bachelor" selected>Bachelor</option><option value="bac5">Bac+5</option></select></label>
 <label>Type de parcours<select id="duration"><option value="12">1 an</option><option value="24">2 ans</option></select></label>
 <label>Date du début de contrat<input id="start" type="date" required></label>
-<label>Jour récurrent de formation à distance<select id="weekday" required></select></label>
+<label>Rythme de formation à distance<select id="weekday" required></select></label>
 </div>
 <fieldset><legend>Jour(s) de repos</legend><div class="rest-line" id="rest"></div></fieldset>
 <h2>Soutenances</h2>
@@ -116,6 +116,7 @@ const kinds={
 const dayNames=["dimanche","lundi","mardi","mercredi","jeudi","vendredi","samedi"];
 const daysShort=["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
 const DAY=86400000, hours=7;
+const fourWeekRhythm="four-weeks";
 const referenceHoursPerMonth=35;
 const percentLabel=new Intl.NumberFormat("fr-FR",{style:"percent",minimumFractionDigits:2,maximumFractionDigits:2});
 const date=(y,m,d)=>Date.UTC(y,m-1,d)/DAY;
@@ -168,7 +169,7 @@ function monthsBetween(a,b){
   return months;
 }
 function calculateDates(c,start,defense,recur){
-  if(recur<1||recur>5||c.rest.includes(recur))throw Error("Choisissez un jour récurrent du lundi au vendredi, hors jours de repos.");
+  if(recur!==fourWeekRhythm&&(recur<1||recur>5||c.rest.includes(recur)))throw Error("Choisissez un rythme de formation ou un jour récurrent du lundi au vendredi, hors jours de repos.");
   const end=lastBusiness(defense);
   if(end===null)throw Error("Aucun jour ouvré éligible pendant le mois de soutenance.");
   const limit=addCalendarMonths(start,3)-1;
@@ -222,10 +223,17 @@ function plan(dates){
       map.set(d,{kind:"fixed",why});
     }
   }
-  for(let w=firstRecurring;w<protectedFrom;w+=7){
-    const d=w+recur-1;
-    if(d<protectedFrom&&eligible(d,c)&&!map.has(d)){
-      map.set(d,{kind:"ordinary",why:"Jour récurrent à partir de la deuxième semaine de formation.",role:"weekly"});
+  const blockRhythm=recur===fourWeekRhythm;
+  const cadence=blockRhythm?28:7;
+  const rhythmReason=blockRhythm
+    ?"Jour de la semaine de formation du cycle de quatre semaines."
+    :"Jour récurrent à partir de la deuxième semaine de formation.";
+  for(let w=firstRecurring;w<protectedFrom;w+=cadence){
+    const trainingDays=blockRhythm?each(w,w+4):[w+recur-1];
+    for(const d of trainingDays){
+      if(d<protectedFrom&&eligible(d,c)&&!map.has(d)){
+        map.set(d,{kind:"ordinary",why:rhythmReason});
+      }
     }
   }
   const previousMonth=monthOffset(defense,-1);
@@ -369,11 +377,14 @@ function renderDates(planDates){
   const endRule=planDates.c.level==="bac5"
     ?"Pour le Bac+5, la date proposée ajoute un mois calendaire."
     :"Pour le Bac+2 et le Bachelor, la date proposée est la dernière date possible afin de laisser une marge pour une poursuite d’études.";
+  const rhythmRule=planDates.recur===fourWeekRhythm
+    ?"La première semaine de formation commence le lundi <strong>"+short(monday(planDates.entry)+7)+"</strong>. Les jours éligibles de cette semaine sont planifiés, puis le cycle reprend toutes les quatre semaines. Le RE complète le volume en cliquant sur les jours éligibles du calendrier."
+    :"Le jour récurrent à partir de la deuxième semaine est le <strong>"+dayNames[planDates.recur]+"</strong>.";
   $("explain").innerHTML=
     '<details open><summary>Calcul de la rentrée</summary><p>Début du contrat le <strong>'+full(planDates.start)+'</strong>. La fenêtre se termine le <strong>'+full(planDates.limit)+'</strong> (3 mois calendaires après le début du contrat, moins 1 jour). La première rentrée compatible est le <strong>'+full(planDates.autoEntry)+'</strong>.</p><p>Rentrée retenue · <strong>'+full(planDates.entry)+'</strong>.</p><p>Rentrées possibles · '+planDates.possible.map(short).join(" · ")+'.</p></details>'+
-    '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. Ensuite, le jour récurrent est le <strong>'+dayNames[planDates.recur]+'</strong>. Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
+    '<details><summary>Semaine de rentrée et rythme</summary><p>La génération réserve la rentrée du '+short(planDates.entry)+' en semaine 1. '+rhythmRule+' Le RE peut ajouter un jour éligible en semaine de rentrée.</p></details>'+
     '<details open><summary>Mois de soutenance et fin de contrat</summary><p>La date de fin de formation retenue est le <strong>'+full(planDates.end)+'</strong>. C’est la seule journée de formation générée dans le mois de soutenance. Les 28 jours qui la précèdent sont protégés. '+endRule+' Date proposée · <strong>'+full(planDates.defaultContractEnd)+'</strong>. Dernière date possible · <strong>'+full(planDates.contractLimit)+'</strong> (2 mois calendaires après la fin de formation, moins 1 jour).</p></details>'+
-    '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Une occurrence récurrente non éligible est sautée.</p></details>';
+    '<details><summary>Jours éligibles et jours fériés</summary><p>Formation du lundi au vendredi sur les jours travaillés déclarés. Les jours fériés et le lundi de Pentecôte sont exclus. Les jours non éligibles sont sautés sans décaler le rythme.</p></details>';
 }
 function render(){
   const count=[...state.map.values()].filter(x=>x.kind==="fixed").length+Number(state.fixedSchedule.dates.includes(state.entry));
@@ -399,7 +410,9 @@ function selectedRest(){
 function renderWeekdays(preferred=$("weekday").value){
   const rest=selectedRest();
   const options=dayNames.map((day,n)=>n>=1&&n<=5&&!rest.includes(n)?'<option value="'+n+'">'+day+'</option>':"").join("");
-  $("weekday").innerHTML='<option value="">'+(options?"Choisir un jour":"Aucun jour ouvré disponible")+'</option>'+options;
+  $("weekday").innerHTML='<option value="">Choisir un rythme</option>'+
+    '<optgroup label="Un jour par semaine">'+options+'</optgroup>'+
+    '<option value="'+fourWeekRhythm+'">1 semaine en formation / 3 semaines en entreprise</option>';
   $("weekday").value=rest.includes(Number(preferred))?"":preferred;
 }
 function loadForm(){
@@ -425,7 +438,8 @@ function readFormDates(){
   const level=$("level").value;
   const levelLabel=$("level").selectedOptions[0].textContent;
   const c={duration,level,rest:selectedRest(),name:levelLabel+" · "+(duration===24?"Formation de deux ans":"Formation d’un an")};
-  return calculateDates(c,start,date(year,month,1),Number($("weekday").value));
+  const rhythm=$("weekday").value;
+  return calculateDates(c,start,date(year,month,1),rhythm===fourWeekRhythm?rhythm:Number(rhythm));
 }
 function generateDates(){
   try{
