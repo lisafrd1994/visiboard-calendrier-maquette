@@ -302,9 +302,14 @@ function calendarMonths(interactive){
     '<section class="month"><h3>'+monthLabel(m)+'</h3><div class="grid">'+grid(m,interactive)+'</div></section>'
   ).join("");
 }
+function calendarHours(){
+  return {
+    plannedHours:state.map.size*hours,
+    referenceHours:durationInMonths(state.start,state.contractEnd)*referenceHoursPerMonth
+  };
+}
 function renderCalendar(){
-  const plannedHours=state.map.size*hours;
-  const referenceHours=durationInMonths(state.start,state.contractEnd)*referenceHoursPerMonth;
+  const {plannedHours,referenceHours}=calendarHours();
   $("stats").innerHTML='<tbody><tr><th scope="row">Heures planifiées</th><td><strong>'+plannedHours+' h</strong> / '+referenceHours+' h</td></tr>'+
     '<tr><th scope="row">Pourcentage</th><td><strong>'+percentLabel.format(plannedHours/referenceHours)+'</strong> <small>(sur '+referenceHoursPerMonth+' h/mois)</small></td></tr></tbody>';
   setMessage("calendar-message",draft?"Dates recalculées. Générez le nouveau calendrier pour appliquer ces dates.":"", "warn");
@@ -329,7 +334,7 @@ function selectDay(d,{jump=false}={}){
 }
 function renderChoice(){
   if(selected===null||selected<state.start||selected>state.contractEnd){
-    $("choice").innerHTML="<p>Cliquez sur un jour d’entreprise éligible pour l’ajouter à la formation. Cliquez sur un jour de formation modifiable pour le retirer.</p>";
+    $("choice").innerHTML="<p>Cliquez sur un jour d’entreprise éligible pour l’ajouter à la formation, dans la limite de 100 %. Cliquez sur un jour de formation modifiable pour le retirer.</p>";
     $("edit").innerHTML=moveSource!==null?'<span class="muted">Journée à déplacer · '+full(moveSource)+'</span><button id="cancel-move" class="ghost">Annuler</button>':"";
     return;
   }
@@ -467,7 +472,7 @@ function hasOtherEntryWeekDay(exclude=null){
   const week=monday(state.entry);
   return [...state.map.keys()].some(d=>d!==state.entry&&d!==exclude&&monday(d)===week);
 }
-function canAddTrainingDay(d){
+function isOpenTrainingDay(d){
   return d>state.entry&&d<state.protectedFrom&&eligible(d,state.c)&&!state.map.has(d)&&
     (monday(d)!==monday(state.entry)||!hasOtherEntryWeekDay());
 }
@@ -549,7 +554,13 @@ document.addEventListener("click",event=>{
   if(button.dataset.day!==undefined){
     const day=Number(button.dataset.day);
     const item=state.map.get(day);
-    if(moveSource===null&&(item?.kind==="ordinary"||canAddTrainingDay(day))){
+    if(moveSource===null&&(item?.kind==="ordinary"||isOpenTrainingDay(day))){
+      const {plannedHours,referenceHours}=calendarHours();
+      if(!item&&plannedHours+hours>referenceHours){
+        selectDay(day);
+        setMessage("calendar-message","Le compteur a atteint 100 % de l’objectif. Retirez ou déplacez une journée modifiable pour ajuster le calendrier.","warn");
+        return;
+      }
       if(item?.kind==="ordinary"&&wouldLeaveEmptyMonth(day)){
         selectDay(day);
         setMessage("calendar-message","Ce retrait laisserait un mois civil complet sans formation. Déplacez cette journée ou ajoutez d’abord une autre journée de formation dans le même mois.","warn");
